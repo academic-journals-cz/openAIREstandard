@@ -23,9 +23,14 @@ msgstr "OpenAIRE Standard Metadata Format"
 msgid "plugins.oaiMetadata.openAIREstandard.description" 
 msgstr "Structures metadata in a way that is consistent with the OpenAIRE Guidelines for Literature Repository Managers v4."
 
-msgid "plugins.generic.openAIREstandard.resourceType.titl" 
+msgid "plugins.generic.openAIREstandard.resourceType.title" 
 msgstr "Type of articles published in this section"
 
 msgid "plugins.generic.openAIREstandard.resourceType.description" 
-msgstr "For better OpenAIRE compliance, uses COAR Resource Type Genres <a target="_new" href="http://vocabularies.coar-repositories.org/documentation/resource_types/2.0.draft/">http://vocabularies.coar-repositories.org/documentation/resource_types/2.0.draft/</a>"
+msgstr "For better OpenAIRE compliance, uses COAR Resource Type Genres <a target=\"_new\" href=\"http://vocabularies.coar-repositories.org/documentation/resource_types/2.0.draft/\">http://vocabularies.coar-repositories.org/documentation/resource_types/2.0.draft/</a>"
 
+msgid "plugins.generic.openAIREstandard.audience.title" 
+msgstr "Choose Audience for articles in this section"
+
+msgid "plugins.generic.openAIREstandard.audience.description" 
+msgstr "A class of entity may be determined by the creator or the publisher or by a third party. An example of audiences given is derived from the <a target=\"_new\" href=\"https://ceds.ed.gov/element/001492\">Common Education Data Standards vocabulary</a>. Please note the list is not exhaustive."
