@@ -183,7 +183,7 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         $subjects = array();
         if (is_array($article->getSubject(null))) {
             foreach ($article->getSubject(null) as $locale => $subject) {
-                $s = array_map('trim', explode(';', $subject));
+                $s = trim($subject);
                 if (!empty($s))
                     $subjects[$locale] = $s;
             }
