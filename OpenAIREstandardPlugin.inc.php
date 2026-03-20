@@ -65,6 +65,7 @@ class OpenAIREstandardPlugin extends GenericPlugin {
 	public function addSectionDAOFieldNames($hookName, $args) {
 		$fields =& $args[1];
 		$fields[] = 'resourceType';
+                $fields[] = 'audience';
 	}
 
 	/**
@@ -85,6 +86,7 @@ class OpenAIREstandardPlugin extends GenericPlugin {
 		$smarty =& $args[1];
 		$output =& $args[2];
 		$smarty->assign('resourceTypeOptions', $this->_getResourceTypeOptions());
+                $smarty->assign('audienceOptions', $this->_getAudienceOptions());
 		$output .= $smarty->fetch($this->getTemplateResource('controllers/grids/settings/section/form/sectionFormAdditionalFields.tpl'));
 		return false;
 	}
@@ -104,7 +106,10 @@ class OpenAIREstandardPlugin extends GenericPlugin {
 		$contextId = $context ? $context->getId() : CONTEXT_ID_NONE;
 		$sectionDao = DAORegistry::getDAO('SectionDAO');
 		$section = $sectionDao->getById($sectionForm->getSectionId(), $contextId);
-		if ($section) $sectionForm->setData('resourceType', $section->getData('resourceType'));
+		if ($section) {
+                    $sectionForm->setData('resourceType', $section->getData('resourceType'));
+                    $sectionForm->setData('audience', $section->getData('audience'));
+                }
 	}
 
 	/**
@@ -120,6 +125,7 @@ class OpenAIREstandardPlugin extends GenericPlugin {
 		$sectionForm =& $args[0];
 		$request = Application::get()->getRequest();
 		$sectionForm->setData('resourceType', $request->getUserVar('resourceType'));
+                $sectionForm->setData('audience', $request->getUserVar('audience'));
 	}
 
 	/**
@@ -136,6 +142,14 @@ class OpenAIREstandardPlugin extends GenericPlugin {
 			$sectionDao = DAORegistry::getDAO('SectionDAO');
 			$section = $sectionDao->getById($sectionForm->getSectionId());			
 			$section->setData('resourceType', $resourceType);
+			$sectionDao->updateObject($section);
+		}
+                
+                $audience = $sectionForm->getData('audience') ? $sectionForm->getData('audience') : '';
+		if (!empty($audience)) {
+			$sectionDao = DAORegistry::getDAO('SectionDAO');
+			$section = $sectionDao->getById($sectionForm->getSectionId());			
+			$section->setData('audience', $audience);
 			$sectionDao->updateObject($section);
 		}
 	}
@@ -184,5 +198,31 @@ class OpenAIREstandardPlugin extends GenericPlugin {
 		$resourceTypeOptions  = $chooseOneOption + $resourceTypeOptions ;
 		return $resourceTypeOptions;
 	}
+        
+        /**
+     * Get an array of Audience tapes for select element
+     * (Includes default '' => "Choose One" string.)
+     * @return array resourceTypeUri => resourceTypeLabel
+     */
+    function _getAudienceOptions() {
+        $audience = array(
+            '' => __('common.chooseOne'),
+            'Administrators' => 'Administrators',
+            'Community Groups' => 'Community Groups',
+            'Counsellors' => 'Counsellors',
+            'Federal Funds Recipients and Applicants' => 'Federal Funds Recipients and Applicants',
+            'Librarians' => 'Librarians',
+            'News Media' => 'News Media',
+            'Other' => 'Other',
+            'Parents and Families' => 'Parents and Families',
+            'Policymakers' => 'Policymakers',
+            'Researchers' => 'Researchers',
+            'School Support Staff' => 'School Support Staff',
+            'Student Financial Aid Providers' => 'Student Financial Aid Providers',
+            'Students' => 'Students',
+            'Teachers' => 'Teachers'
+        );
+        return $audience;
+    }
 }
 

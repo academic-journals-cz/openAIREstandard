@@ -12,4 +12,7 @@
 	{fbvFormSection title="plugins.generic.openAIREstandard.resourceType.title" for="resourceType" inline=true}
 		{fbvElement type="select" id="resourceType" from=$resourceTypeOptions selected=$resourceType label="plugins.generic.openAIREstandard.resourceType.description" translate=false}
 	{/fbvFormSection}
+        {fbvFormSection title="plugins.generic.openAIREstandard.audience.title" for="audience" inline=true}
+		{fbvElement type="select" id="audience" from=$audienceOptions selected=$audience label="plugins.generic.openAIREstandard.audience.description" translate=false}
+	{/fbvFormSection}
 </div>

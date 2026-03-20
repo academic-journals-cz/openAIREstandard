@@ -40,6 +40,7 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         $articleDoi = $article->getStoredPubId('doi');
         $accessRights = $this->_getAccessRights($journal, $issue, $article);
         $resourceType = ($section->getData('resourceType') ? $section->getData('resourceType') : 'http://purl.org/coar/resource_type/c_6501'); # COAR resource type URI, defaults to "journal article"
+        $audience = $section->getData('audience');
         if (!$datePublished)
             $datePublished = $issue->getDatePublished();
         if ($datePublished)
@@ -269,6 +270,12 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
             $response .= "<oaire:citationStartPag>" . $pageInfo['fpage'] . "</oaire:citationStartPag>\n"
                     . "<oaire:citationEndPage>" . $pageInfo['lpage'] . "</oaire:citationEndPage>\n";
         }
+        
+        //32. Audience (O)
+        if ($audience) {
+            $response .= "<dcterms:audience>" . htmlspecialchars($audience) . "</dcterms:audience>\n";
+        } 
+        
         $response .= "</resource>\n";
         
         return $response;
