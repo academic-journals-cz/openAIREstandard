@@ -23,7 +23,7 @@ PHP 8.0 or greater.
 ## Example
 https://cyberpsychology.eu/oai?verb=ListRecords&metadataPrefix=oai_openaire
 
-# Credit
+## Legacy Credit
 ---------------
 This plugin was developed at the [Masaryk University Press - Munipress](https://www.press.muni.cz), as part of its active participation in the [Craft-OA project](https://www.craft-oa.eu/).
 
