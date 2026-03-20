@@ -48,17 +48,19 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         $abbreviation = $journal->getLocalizedSetting('abbreviation');
         $printIssn = $journal->getSetting('printIssn');
         $onlineIssn = $journal->getSetting('onlineIssn');
-        $articleLocale = $article->getLocale();
+        $articleLocale = $article->getDefaultLocale();
         $publisherInstitution = $journal->getSetting('publisherInstitution');
-        $datePublished = $article->getDatePublished();
+        $datePublished = $publication->getData('datePublished');
         $articleDoi = $article->getStoredPubId('doi');
         $accessRights = $this->_getAccessRights($journal, $issue, $article);
         $resourceType = ($section->getData('resourceType') ? $section->getData('resourceType') : 'http://purl.org/coar/resource_type/c_6501'); # COAR resource type URI, defaults to "journal article"
         $audience = $section->getData('audience');
-        if (!$datePublished)
-            $datePublished = $issue->getDatePublished();
-        if ($datePublished)
+        if (!$datePublished) {
+            $datePublished = $issue->getData('datePublished');
+        }
+        if ($datePublished){
             $datePublished = strtotime($datePublished);
+        }
         $parentPlugin = PluginRegistry::getPlugin('generic', 'openairestandardplugin');
 
         //resource - defining schemas and namespaces
@@ -66,9 +68,9 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
 
         //1. Title (M) - Translated article titles
         $response .= "<datacite:titles>\n"
-                . "<datacite:title xml:lang=\"" . substr($articleLocale, 0, 2) . "\">" . htmlspecialchars(strip_tags($article->getTitle($articleLocale))) . "</datacite:title>\n";
+                . "<datacite:title xml:lang=\"" . substr($articleLocale, 0, 2) . "\">" . htmlspecialchars(strip_tags($article->getLocalizedData('title',$articleLocale))) . "</datacite:title>\n";
 
-        if (!empty($subtitle = $article->getSubtitle($articleLocale))) {
+        if (!empty($subtitle = $article->getLocalizedData('subtitle', $articleLocale))) {
             $response .= "<datacite:title xml:lang=\"" . substr($articleLocale, 0, 2) . "\" titleType=\"subtitle\">" . htmlspecialchars($subtitle) . "</datacite:title>\n";
         }
         foreach ($article->getFullTitle(null) as $locale => $title) {
@@ -76,7 +78,7 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
                 continue;
             if ($title) {
                 $response .= "<datacite:title xml:lang=\"" . substr($locale, 0, 2) . "\">" . htmlspecialchars(strip_tags($title)) . "</datacite:title>\n";
-                if (!empty($subtitle = $article->getSubtitle($locale))) {
+                if (!empty($subtitle = $article->getLocalizedData('subtitle', $articleLocale))) {
                     $response .= "<datacite:title xml:lang=\"" . substr($locale, 0, 2) . "\" titleType=\"Subtitle\">" . htmlspecialchars($subtitle) . "</datacite:title>\n";
                 }
             }
@@ -87,7 +89,7 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         $response .= "<datacite:creators>\n";
         $affiliations = array();
         foreach ($article->getCurrentPublication()->getData('authors') as $author) {
-            $affiliation = $author->getLocalizedAffiliation();
+            $affiliation = $author->getLocalizedData('affiliation');
             $response .= "<datacite:creator>\n" .
                     "<datacite:creatorName nameType=\"Personal\">" . htmlspecialchars((method_exists($author, 'getLastName') ? $author->getLastName() : $author->getLocalizedFamilyName()) . ", " . (method_exists($author, 'getFirstName') ? $author->getFirstName() : $author->getLocalizedGivenName()) . (((method_exists($author, 'getMiddleName') && $s = $author->getMiddleName()) != '') ? " $s" : '')) . "</datacite:creatorName>\n" .
                     "<datacite:givenName>" . htmlspecialchars(method_exists($author, 'getFirstName') ? $author->getFirstName() : $author->getLocalizedGivenName()) . (((method_exists($author, 'getMiddleName') && $s = $author->getMiddleName()) != '') ? " $s" : '') . "</datacite:givenName>\n" .

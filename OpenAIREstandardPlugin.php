@@ -21,6 +21,8 @@ use PKP\db\DAORegistry;
 use PKP\plugins\GenericPlugin;
 use PKP\plugins\Hook;
 use PKP\plugins\PluginRegistry;
+use APP\plugins\generic\openAIREstandard\OAIMetadataFormatPlugin_OpenAIREstandard;
+use APP\plugins\generic\openAIREstandard\OpenAIREstandardGatewayPlugin;
 
 class OpenAIREstandardPlugin extends GenericPlugin {
 
@@ -30,9 +32,7 @@ class OpenAIREstandardPlugin extends GenericPlugin {
     function register($category, $path, $mainContextId = null) {
         $success = parent::register($category, $path, $mainContextId);
         if ($success && $this->getEnabled($mainContextId)) {
-            $this->import('OAIMetadataFormatPlugin_OpenAIREstandard');
             PluginRegistry::register('oaiMetadataFormats', new OAIMetadataFormatPlugin_OpenAIREstandard($this), $this->getPluginPath());
-            $this->import('OpenAIREstandardGatewayPlugin');
             PluginRegistry::register('gateways', new OpenAIREstandardGatewayPlugin($this), $this->getPluginPath());
 
             # Handle COAR resource types in section forms
@@ -153,6 +153,9 @@ class OpenAIREstandardPlugin extends GenericPlugin {
         if (!empty($resourceType)) {
             $section = Repo::section()->get($sectionForm->getSectionId());
             $section->setData('resourceType', $resourceType);
+        }
+        $audience = $sectionForm->getData('audience') ? $sectionForm->getData('audience') : '';
+        if (!empty($audience)) {
             $section->setData('audience', $audience);
             Repo::section()->edit($section, []);
         }
