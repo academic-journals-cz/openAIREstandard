@@ -153,6 +153,12 @@ class OpenAIREstandardPlugin extends GenericPlugin {
         if (!empty($resourceType)) {
             $section = Repo::section()->get($sectionForm->getSectionId());
             $section->setData('resourceType', $resourceType);
+            Repo::section()->edit($section, []);
+        }
+        
+        $audience = $sectionForm->getData('audience') ? $sectionForm->getData('audience') : '';
+        if (!empty($audience)) {
+            $section = Repo::section()->get($sectionForm->getSectionId());
             $section->setData('audience', $audience);
             Repo::section()->edit($section, []);
         }
