@@ -81,20 +81,6 @@ class OpenAIREstandardPlugin extends GenericPlugin {
         return false;
     }
 
-    /**
-     * Add fields to the section editing form
-     *
-     * @param $hookName string `Templates::Manager::Sections::SectionForm::AdditionalMetadata`
-     * @param $args array [
-     * 		@option array [
-     * 				@option name string Hook name
-     * 				@option sectionId int
-     * 		]
-     * 		@option Smarty
-     * 		@option string
-     * ]
-     * @return bool
-     */
     public function addSectionFormFields($hookName, $args) {
         $smarty = & $args[1];
         $output = & $args[2];
