@@ -3,8 +3,8 @@
 /**
  * @file plugins/generic/openAIREstandard/OpenAIREstandardPlugin.inc.php
  *
- * Copyright (c) 2014-2024 Simon Fraser University
- * Copyright (c) 2003-2024 John Willinsky
+ * Copyright (c) 2014-2026 Simon Fraser University
+ * Copyright (c) 2003-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class OpenAIREstandardPlugin
@@ -17,7 +17,7 @@ namespace APP\plugins\generic\openAIREstandard;
 
 use APP\core\Application;
 use APP\facades\Repo;
-use PKP\db\DAORegistry;
+use stdClass;
 use PKP\plugins\GenericPlugin;
 use PKP\plugins\Hook;
 use PKP\plugins\PluginRegistry;
@@ -29,7 +29,8 @@ class OpenAIREstandardPlugin extends GenericPlugin {
     /**
      * @copydoc Plugin::register()
      */
-    function register($category, $path, $mainContextId = null) {
+    public function register($category, $path, $mainContextId = null)
+    {
         $success = parent::register($category, $path, $mainContextId);
         if ($success && $this->getEnabled($mainContextId)) {
             PluginRegistry::register('oaiMetadataFormats', new OAIMetadataFormatPlugin_OpenAIREstandard($this), $this->getPluginPath());
@@ -37,10 +38,10 @@ class OpenAIREstandardPlugin extends GenericPlugin {
 
             # Handle COAR resource types in section forms
             Hook::add('Schema::get::section', [$this, 'addToSchema']);
-            Hook::add('Templates::Manager::Sections::SectionForm::AdditionalMetadata', array($this, 'addSectionFormFields'));
-            Hook::add('sectionform::initdata', array($this, 'initDataSectionFormFields'));
-            Hook::add('sectionform::readuservars', array($this, 'readSectionFormFields'));
-            Hook::add('sectionform::execute', array($this, 'executeSectionFormFields'));
+            Hook::add('Templates::Manager::Sections::SectionForm::AdditionalMetadata', [$this, 'addSectionFormFields']);
+            Hook::add('sectionform::initdata', [$this, 'initDataSectionFormFields']);
+            Hook::add('sectionform::readuservars', [$this, 'readSectionFormFields']);
+            Hook::add('sectionform::execute', [$this, 'executeSectionFormFields']);
 
             $this->_registerTemplateResource();
         }
@@ -50,22 +51,26 @@ class OpenAIREstandardPlugin extends GenericPlugin {
     /**
      * @copydoc Plugin::getDisplayName()
      */
-    function getDisplayName() {
+    public function getDisplayName(): string
+    {
         return __('plugins.generic.openAIREstandard.displayName');
     }
 
     /**
      * @copydoc Plugin::getDescription()
      */
-    function getDescription() {
+    public function getDescription(): string
+    {
         return __('plugins.generic.openAIREstandard.description');
     }
 
     /**
      * Extend the section entity's schema with an resourceType property
      */
-    public function addToSchema(string $hookName, array $args) {
-        $schema = $args[0];/** @var stdClass */
+    public function addToSchema(string $hookName, array $args): bool
+    {
+        /** @var stdClass $schema */
+        $schema = $args[0];
         $schema->properties->resourceType = (object) [
                     'type' => 'string',
                     'apiSummary' => true,
@@ -81,11 +86,12 @@ class OpenAIREstandardPlugin extends GenericPlugin {
         return false;
     }
 
-    public function addSectionFormFields($hookName, $args) {
+    public function addSectionFormFields(string $hookName, array $args): bool
+    {
         $smarty = & $args[1];
         $output = & $args[2];
-        $smarty->assign('resourceTypeOptions', $this->_getResourceTypeOptions());
-        $smarty->assign('audienceOptions', $this->_getAudienceOptions());
+        $smarty->assign('resourceTypeOptions', $this->getResourceTypeOptions());
+        $smarty->assign('audienceOptions', $this->getAudienceOptions());
         $output .= $smarty->fetch($this->getTemplateResource('controllers/grids/settings/section/form/sectionFormAdditionalFields.tpl'));
         return false;
     }
@@ -98,12 +104,16 @@ class OpenAIREstandardPlugin extends GenericPlugin {
      * 		@option SectionForm
      * ]
      */
-    public function initDataSectionFormFields($hookName, $args) {
+    public function initDataSectionFormFields(string $hookName, array $args): void
+    {
         $sectionForm = $args[0];
-        $request = Application::get()->getRequest();
-        $context = $request->getContext();
-        $contextId = $context ? $context->getId() : CONTEXT_ID_NONE;
-        $section = Repo::section()->get($sectionForm->getSectionId());
+        $sectionId = $sectionForm->getSectionId();
+        if (!$sectionId) {
+            // New section being added; nothing to pre-populate yet.
+            return;
+        }
+        $context = Application::get()->getRequest()->getContext();
+        $section = Repo::section()->get($sectionId, $context?->getId());
         if ($section) {
             $sectionForm->setData('resourceType', $section->getData('resourceType'));
             $sectionForm->setData('audience', $section->getData('audience'));
@@ -119,7 +129,8 @@ class OpenAIREstandardPlugin extends GenericPlugin {
      * 		@option array User vars
      * ]
      */
-    public function readSectionFormFields($hookName, $args) {
+    public function readSectionFormFields(string $hookName, array $args): void
+    {
         $sectionForm = & $args[0];
         $request = Application::get()->getRequest();
         $sectionForm->setData('resourceType', $request->getUserVar('resourceType'));
@@ -130,30 +141,29 @@ class OpenAIREstandardPlugin extends GenericPlugin {
      * Save additional fields in the section editing form
      *
      * @param $hookName string `sectionform::execute`
-     * @param $args array
-     *
      */
-    public function executeSectionFormFields($hookName, $args) {
+    public function executeSectionFormFields(string $hookName, array $args): void
+    {
         $sectionForm = $args[0];
         $resourceType = $sectionForm->getData('resourceType') ? $sectionForm->getData('resourceType') : '';
-        if (!empty($resourceType)) {
-            $section = Repo::section()->get($sectionForm->getSectionId());
-            $section->setData('resourceType', $resourceType);
-        }
         $audience = $sectionForm->getData('audience') ? $sectionForm->getData('audience') : '';
-        if (!empty($audience)) {
-            $section->setData('audience', $audience);
-            Repo::section()->edit($section, []);
+        if (!empty($resourceType) || !empty($audience)) {
+            $context = Application::get()->getRequest()->getContext();
+            $section = Repo::section()->get($sectionForm->getSectionId(), $context?->getId());
+            if ($section) {
+                $section->setData('resourceType', $resourceType);
+                $section->setData('audience', $audience);
+                Repo::section()->edit($section, []);
+            }
         }
     }
 
     /**
      * Get a COAR Resource Type by URI. If $uri is null return all.
-     * @param $uri string
-     * @return mixed
      */
-    function _getCoarResourceType($uri = null) {
-        $resourceTypes = array(
+    public function getCoarResourceType(?string $uri = null): array|string|null
+    {
+        $resourceTypes = [
             'http://purl.org/coar/resource_type/c_6501' => 'journal article',
             'http://purl.org/coar/resource_type/c_2df8fbb1' => 'research article',
             'http://purl.org/coar/resource_type/c_dcae04bc' => 'review article',
@@ -170,10 +180,10 @@ class OpenAIREstandardPlugin extends GenericPlugin {
             'http://purl.org/coar/resource_type/c_46ec' => 'thesis',
             'http://purl.org/coar/resource_type/c_8042' => 'working paper',
             'http://purl.org/coar/resource_type/c_816b' => 'preprint',
-            'http://purl.org/coar/resource_type/c_1843' => 'other'
-        );
+            'http://purl.org/coar/resource_type/c_1843' => 'other',
+        ];
         if ($uri) {
-            return $resourceTypes[$uri];
+            return $resourceTypes[$uri] ?? null;
         } else {
             return $resourceTypes;
         }
@@ -184,10 +194,11 @@ class OpenAIREstandardPlugin extends GenericPlugin {
      * (Includes default '' => "Choose One" string.)
      * @return array resourceTypeUri => resourceTypeLabel
      */
-    function _getResourceTypeOptions() {
-        $resourceTypeOptions = $this->_getCoarResourceType(null);
+    protected function getResourceTypeOptions(): array
+    {
+        $resourceTypeOptions = $this->getCoarResourceType(null);
         $chooseOne = __('common.chooseOne');
-        $chooseOneOption = array('' => $chooseOne);
+        $chooseOneOption = ['' => $chooseOne];
         $resourceTypeOptions = $chooseOneOption + $resourceTypeOptions;
         return $resourceTypeOptions;
     }
@@ -197,8 +208,9 @@ class OpenAIREstandardPlugin extends GenericPlugin {
      * (Includes default '' => "Choose One" string.)
      * @return array resourceTypeUri => resourceTypeLabel
      */
-    function _getAudienceOptions() {
-        $audience = array(
+    protected function getAudienceOptions(): array
+    {
+        $audience = [
             '' => __('common.chooseOne'),
             'Administrators' => 'Administrators',
             'Community Groups' => 'Community Groups',
@@ -213,8 +225,8 @@ class OpenAIREstandardPlugin extends GenericPlugin {
             'School Support Staff' => 'School Support Staff',
             'Student Financial Aid Providers' => 'Student Financial Aid Providers',
             'Students' => 'Students',
-            'Teachers' => 'Teachers'
-        );
+            'Teachers' => 'Teachers',
+        ];
         return $audience;
     }
 }

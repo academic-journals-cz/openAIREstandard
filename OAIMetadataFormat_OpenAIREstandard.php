@@ -6,8 +6,8 @@
 /**
  * @file OAIMetadataFormat_OpenAIREstandard.php
  *
- * Copyright (c) 2013-2024 Simon Fraser University
- * Copyright (c) 2003-2024 John Willinsky
+ * Copyright (c) 2013-2026 Simon Fraser University
+ * Copyright (c) 2003-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class OAIMetadataFormat_OpenAIREstandard
@@ -21,41 +21,49 @@ namespace APP\plugins\generic\openAIREstandard;
 
 use APP\core\Application;
 use APP\facades\Repo;
+use APP\issue\Issue;
+use APP\journal\Journal;
+use APP\plugins\generic\funding\classes\Funder;
+use APP\plugins\generic\funding\classes\FunderAward;
+use APP\plugins\generic\funding\classes\FunderAwardDAO;
+use APP\plugins\generic\funding\classes\FunderDAO;
+use APP\publication\Publication;
+use APP\submission\Submission;
 use PKP\core\PKPString;
+use PKP\db\DAOResultFactory;
 use PKP\facades\Locale;
 use PKP\oai\OAIMetadataFormat;
 use PKP\plugins\PluginRegistry;
-use PKP\plugins\Hook;
 use PKP\db\DAORegistry;
 use PKP\submission\Genre;
+use PKP\submission\GenreDAO;
 use PKP\submissionFile\SubmissionFile;
 use PKP\i18n\LocaleConversion;
-use PKP\plugins\GenericPlugin;
 use PKP\core\PKPApplication;
 
 class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
 
     /**
-     * @see OAIMetadataFormat#toXml
+     * @see OAIMetadataFormat::toXml()
      */
-    function toXml($record, $format = null) {
+    public function toXml($record, $format = null): string
+    {
         $request = Application::get()->getRequest();
         $article = $record->getData('article');
         $journal = $record->getData('journal');
         $section = $record->getData('section');
         $issue = $record->getData('issue');
-        
+
         $publication = $article->getCurrentPublication();
-        $articleBestId = strlen($urlPath = (string) $publication->getData('urlPath')) ? $urlPath : $article->getId();
 
         $galleys = $publication->getData('galleys');
-        $printIssn = $journal->getSetting('printIssn');
-        $onlineIssn = $journal->getSetting('onlineIssn');
+        $printIssn = $journal->getData('printIssn');
+        $onlineIssn = $journal->getData('onlineIssn');
         $publicationLocale = $publication->getData('locale');
-        $publisherInstitution = $journal->getSetting('publisherInstitution');
+        $publisherInstitution = $journal->getData('publisherInstitution');
         $datePublished = $publication->getData('datePublished');
-        $publicationDoi = $publication->getStoredPubId('doi');
-        $accessRights = $this->_getAccessRights($journal, $issue, $article);
+        $publicationDoi = $publication->getDoi();
+        $accessRights = $this->getAccessRights($journal, $issue, $publication);
         $resourceType = ($section->getData('resourceType') ? $section->getData('resourceType') : 'http://purl.org/coar/resource_type/c_6501'); # COAR resource type URI, defaults to "journal article"
         $audience = $section->getData('audience');
         if (!$datePublished) {
@@ -64,6 +72,7 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         if ($datePublished) {
             $datePublished = strtotime($datePublished);
         }
+        /** @var OpenAIREstandardPlugin $parentPlugin */
         $parentPlugin = PluginRegistry::getPlugin('generic', 'openairestandardplugin');
 
         //resource - defining schemas and namespaces
@@ -71,16 +80,16 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
 
         //1. Title (M) - Translated article titles
         $response .= "<datacite:titles>\n"
-                . "<datacite:title xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($publicationLocale)) . "\">" . htmlspecialchars(strip_tags($publication->getLocalizedData('title', $publicationLocale))) . "</datacite:title>\n";
+                . "<datacite:title xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($publicationLocale)) . "\">" . htmlspecialchars(strip_tags($publication->getData('title', $publicationLocale))) . "</datacite:title>\n";
 
-        if (!empty($subtitle = $publication->getLocalizedData('subtitle', $publicationLocale))) {
-            $response .= "<datacite:title xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($publicationLocale)) . "\" titleType=\"subtitle\">" . htmlspecialchars($subtitle) . "</datacite:title>\n";
+        if (!empty($subtitle = $publication->getData('subtitle', $publicationLocale))) {
+            $response .= "<datacite:title xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($publicationLocale)) . "\" titleType=\"subtitle\">" . htmlspecialchars(strip_tags($subtitle)) . "</datacite:title>\n";
         }
-        foreach ($publication->getFullTitles() as $locale => $title) {
+        foreach ((array) $publication->getData('title') as $locale => $title) {
             if ($title != '' && $locale != $publicationLocale) {
                 $response .= "<datacite:title xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($locale)) . "\">" . htmlspecialchars(strip_tags($title)) . "</datacite:title>\n";
-                if (!empty($subtitle = $publication->getLocalizedData('subtitle', $locale))) {
-                    $response .= "<datacite:title xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($locale)) . "\" titleType=\"Subtitle\">" . htmlspecialchars($subtitle) . "</datacite:title>\n";
+                if (!empty($subtitle = $publication->getData('subtitle', $locale))) {
+                    $response .= "<datacite:title xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($locale)) . "\" titleType=\"Subtitle\">" . htmlspecialchars(strip_tags($subtitle)) . "</datacite:title>\n";
                 }
             }
         }
@@ -88,42 +97,39 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
 
         //2. Creator (M) - Authors
         $response .= "<datacite:creators>\n";
-        $affiliations = array();
-        foreach ($article->getCurrentPublication()->getData('authors') as $author) {
-            $affiliation = $author->getLocalizedData('affiliation');
+        foreach ($publication->getData('authors') as $author) {
+            $affiliation = $author->getLocalizedAffiliationNamesAsString($publicationLocale);
             $response .= "<datacite:creator>\n" .
-                    "<datacite:creatorName nameType=\"Personal\">" . htmlspecialchars((method_exists($author, 'getLastName') ? $author->getLastName() : $author->getLocalizedFamilyName()) . ", " . (method_exists($author, 'getFirstName') ? $author->getFirstName() : $author->getLocalizedGivenName()) . (((method_exists($author, 'getMiddleName') && $s = $author->getMiddleName()) != '') ? " $s" : '')) . "</datacite:creatorName>\n" .
-                    "<datacite:givenName>" . htmlspecialchars(method_exists($author, 'getFirstName') ? $author->getFirstName() : $author->getLocalizedGivenName()) . (((method_exists($author, 'getMiddleName') && $s = $author->getMiddleName()) != '') ? " $s" : '') . "</datacite:givenName>\n" .
-                    "<datacite:familyName>" . htmlspecialchars(method_exists($author, 'getLastName') ? $author->getLastName() : $author->getLocalizedFamilyName()) . "</datacite:familyName>\n" .
+                    "<datacite:creatorName nameType=\"Personal\">" . htmlspecialchars($author->getFamilyName($publicationLocale) . ", " . $author->getGivenName($publicationLocale)) . "</datacite:creatorName>\n" .
+                    "<datacite:givenName>" . htmlspecialchars($author->getGivenName($publicationLocale)) . "</datacite:givenName>\n" .
+                    "<datacite:familyName>" . htmlspecialchars($author->getFamilyName($publicationLocale)) . "</datacite:familyName>\n" .
                     ($author->getOrcid() ? "<datacite:nameIdentifier nameIdentifierScheme=\"ORCID\" schemeURI=\"http://orcid.org\">" . htmlspecialchars($author->getOrcid()) . "</datacite:nameIdentifier>\n" : '') .
                     ($affiliation ? "<datacite:affiliation>" . htmlspecialchars($affiliation) . "</datacite:affiliation>\n" : '') .
                     "</datacite:creator>\n";
         }
         $response .= "</datacite:creators>\n";
 
-        //4. Funding Reference (MA) - Fetch funding data from other plugins if available - TODO
-        $fundingReferences = null;
-        Hook::call('OAIMetadataFormat_OpenAIREStandard::findFunders', [&$$articleBestId, &$fundingReferences]);
+        //4. Funding Reference (MA) - from the Funding plugin, if installed and enabled
+        $fundingReferences = $this->getFundingReferences($article->getId());
         if ($fundingReferences) {
             $response .= $fundingReferences;
         }
 
         //5. Alternate Identifier (R)
-        If (!empty($publicationDoi)) {
+        if (!empty($publicationDoi)) {
             $response .= "<datacite:alternateIdentifiers>\n"
                     . "<datacite:alternateIdentifier alternateIdentifierType=\"DOI\">" . htmlspecialchars($publicationDoi) . "</datacite:alternateIdentifier>\n"
                     . "</datacite:alternateIdentifiers>\n";
         }
 
-
         //8. Languages (MA) - taken from galley locales
-        $galleyLocales = Array();
-        $mainGalleysList = array();
+        $galleyLocales = [];
+        $mainGalleysList = [];
         foreach ($galleys as $galley) {
             $galleyFile = Repo::submissionFile()->get((int) $galley->getData('submissionFileId'));
             $galleyLocale = $galley->getLocale();
-            if($galleyFile && $this->isMainSubmission($galleyFile)) {
-                $mainGalleysList[] = $galley;
+            if($galleyFile && $this->isMainDocumentFile($galleyFile)) {
+                $mainGalleysList[] = ['galley' => $galley, 'file' => $galleyFile];
                 if (!in_array($galleyLocale, $galleyLocales)) {
                     $response .= "<dc:language>" . htmlspecialchars(LocaleConversion::toBcp47($galleyLocale)) . "</dc:language>\n";
                     $galleyLocales[] = $galleyLocale;
@@ -139,7 +145,7 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
             $response .= "<dc:source>eISSN: " . $onlineIssn . "</dc:source>";
         }
 
-        //9. Publisher (MA) 
+        //9. Publisher (MA)
         $response .= ($publisherInstitution != '' ? "<dc:publisher>" . htmlspecialchars($publisherInstitution) . "</dc:publisher>\n" : '');
 
         // 10. Publication date (M)
@@ -150,13 +156,12 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         }
 
         //11. Resource Type (M)
-        $coarResourceLabel = $parentPlugin->_getCoarResourceType($resourceType);
+        $coarResourceLabel = $parentPlugin->getCoarResourceType($resourceType);
         if ($coarResourceLabel) {
             $response .= "<oaire:resourceType uri=\"" . $resourceType . "\" resourceTypeGeneral=\"literature\">" . $coarResourceLabel . "</oaire:resourceType>\n";
         }
 
         //12. description - abstract + translated abstracts
-
         $abstracts = $publication->getData('abstract') ?: [];
         foreach ($abstracts as $locale => $abstract) {
             if ($abstract != '')
@@ -164,39 +169,36 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
             $response .= "<dc:description xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($locale)) . "\">" . htmlspecialchars($abstract) . "</dc:description>\n";
         }
 
-
         //13. Format (R)
-        foreach ($mainGalleysList as $galley) {
-            $galleyFile = Repo::submissionFile()->get((int) $galley->getData('submissionFileId'));
-            $response .= "<dc:format>" . htmlspecialchars($galleyFile->getData('mimetype')) . "</dc:format>\n";
+        foreach ($mainGalleysList as $mainGalley) {
+            $response .= "<dc:format>" . htmlspecialchars($mainGalley['file']->getData('mimetype')) . "</dc:format>\n";
         }
 
-        //14. Resource Identifier (M) - landing page link                 
-        $response .= "<datacite:identifier identifierType=\"URL\">" . $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, null, 'article', 'view', [$articleBestId], urlLocaleForPage: '') . "</datacite:identifier>\n";
+        //14. Resource Identifier (M) - landing page link
+        $response .= "<datacite:identifier identifierType=\"URL\">" . $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, null, 'article', 'view', [$article->getBestId()], urlLocaleForPage: '') . "</datacite:identifier>\n";
 
-        //15. Access Rights (M) - OpenAIRE COAR Access Rights 
-        $coarAccessRights = $this->_getCoarAccessRights();
+        //15. Access Rights (M) - OpenAIRE COAR Access Rights
+        $coarAccessRights = self::COAR_ACCESS_RIGHTS;
 
         if ($accessRights) {
             $response .= "<datacite:rights rightsURI=\"" . $coarAccessRights[$accessRights]['url'] . "\">" . $coarAccessRights[$accessRights]['label'] . "</datacite:rights>\n";
         }
 
-        //17. Subject (MA) - subjects + keywords                
+        //17. Subject (MA) - subjects + keywords
         $subjectsOutput = "";
         if ($subjects = $publication->getData('subjects')) {
             foreach ($subjects as $locale => $localeSubjects) {
-                foreach ($localeSubjects as $i => $subject) {
-                    $subjectsOutput .= "<datacite:subject xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($locale)) . "\">" . htmlspecialchars(trim($subject)) . "</datacite:subject>\n";
+                foreach ($localeSubjects as $subject) {
+                    $subjectsOutput .= "<datacite:subject xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($locale)) . "\">" . htmlspecialchars(trim($subject['name'])) . "</datacite:subject>\n";
                 }
             }
         }
 
         $keywordsOutput = "";
-
         if ($keywords = $publication->getData('keywords')) {
             foreach ($keywords as $locale => $localeKeywords) {
-                foreach ($localeKeywords as $i => $keyword) {
-                    $keywordsOutput .= "<datacite:subject xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($locale)) . "\">" . htmlspecialchars($keyword) . "</datacite:subject>\n";
+                foreach ($localeKeywords as $keyword) {
+                    $keywordsOutput .= "<datacite:subject xml:lang=\"" . htmlspecialchars(LocaleConversion::toBcp47($locale)) . "\">" . htmlspecialchars($keyword['name']) . "</datacite:subject>\n";
                 }
             }
         }
@@ -208,49 +210,45 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
             $response .= "</datacite:subjects>\n";
         }
 
-        //18. Licence Condition (R) 
+        //18. Licence Condition (R)
         $licenseUrl = $publication->getData('licenseUrl');
 
         $openAccessDate = null;
         if ($accessRights == 'embargoedAccess') {
-            $openAccessDate = date('Y-m-d', strtotime($issue->getOpenAccessDate()));
+            $openAccessDate = strtotime($issue->getOpenAccessDate());
         } else {
             $openAccessDate = $datePublished;
         }
         if ($licenseUrl) {
-            $ccLabel = $this->_getCCLicenseLabel($licenseUrl);
-            $response .= "<oaire:licenseCondition startDate=\"" . date('Y-m-d', $openAccessDate) . "\" uri=\"" . htmlspecialchars($licenseUrl) . "\">" . strip_tags($ccLabel) . "</oaire:licenseCondition>\n";
+            $ccLabel = $this->getCCLicenseLabel($licenseUrl, $publicationLocale);
+            $response .= "<oaire:licenseCondition startDate=\"" . date('Y-m-d', $openAccessDate) . "\" uri=\"" . htmlspecialchars($licenseUrl) . "\">" . strip_tags($ccLabel ?? $licenseUrl) . "</oaire:licenseCondition>\n";
         }
 
         //19. Coverage (R)
-        if ($coverages = $publication->getData('coverage')) {
+        if ($coverages = $publication->getLocalizedData('coverage', $publicationLocale)) {
             if (trim($coverages) != '') {
                 $response .= "<dc:coverage>" . htmlspecialchars(trim($coverages)) . "</dc:coverage>\n";
             }
         }
 
-        //20. Size (O) - gallyes file sizes + page count		
-        $pageInfo = $this->_getPageInfo($publication);
-//        if ($galleys || $pageInfo) {
+        //20. Size (O) - page count only; galley file sizes aren't reported here since
+        // OJS doesn't store them and computing them would require a filesystem stat
+        // per file on every OAI request, for little added value.
+        $pageInfo = $this->getPageInfo($publication);
         if ($pageInfo) {
-            $response .= "<datacite:sizes>\n";
-            $response .= ($pageInfo ? "<datacite:size>" . (int) $pageInfo['pagecount'] . " Pages</datacite:size>\n" : '');
-            $response .= "</datacite:sizes>\n";
+            $response .= "<datacite:sizes>\n"
+                    . "<datacite:size>" . (int) $pageInfo['pagecount'] . " Pages</datacite:size>\n"
+                    . "</datacite:sizes>\n";
         }
 
         //23. File Location (MA) - full text links
-
-        foreach ($mainGalleysList as $galley) {
-            $remoteUrl = $galley->getData('urlRemote');
-            $galleyFile = Repo::submissionFile()->get((int) $galley->getData('submissionFileId'));
-            $fileService = app()->get('file');
-            $filepath = $fileService->get($galleyFile->getData('fileId'))->path;           
-            
-            if ($remoteUrl || $filepath) {
-                $response .= "<oaire:file accessRightsURI=\"" . $coarAccessRights[$accessRights]['url'] . "\" mimeType=\"" . htmlspecialchars($galleyFile->getData('mimetype')) . "\" objectType=\"fulltext\">" . htmlspecialchars($request->url($journal->getPath(), 'article', 'download', array($articleBestId, $galley->getBestGalleyId()), null, null, true)) . "</oaire:file>\n";
+        foreach ($mainGalleysList as $mainGalley) {
+            $galley = $mainGalley['galley'];
+            $galleyFile = $mainGalley['file'];
+            if ($galleyFile->getData('fileId')) {
+                $response .= "<oaire:file accessRightsURI=\"" . $coarAccessRights[$accessRights]['url'] . "\" mimeType=\"" . htmlspecialchars($galleyFile->getData('mimetype')) . "\" objectType=\"fulltext\">" . htmlspecialchars($request->url($journal->getPath(), 'article', 'download', [$article->getBestId(), $galley->getBestGalleyId()], null, null, true)) . "</oaire:file>\n";
             }
         }
-        
 
         //24. Citation Title (R)
         $response .= "<oaire:citationTitle>" . htmlspecialchars($journal->getName($journal->getPrimaryLocale())) . "</oaire:citationTitle>\n";
@@ -281,28 +279,59 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         return $response;
     }
 
+    protected const COAR_ACCESS_RIGHTS = [
+        'openAccess' => ['label' => 'open access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
+        'embargoedAccess' => ['label' => 'embargoed access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
+        'restrictedAccess' => ['label' => 'restricted access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
+        'metadataOnlyAccess' => ['label' => 'metadata only access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
+    ];
+
     /**
-     * Get an associative array containing COAR Access Rights.
-     * @return array
+     * Get OpenAIRE oaire:fundingReferences XML for a submission's funders,
+     * if the Funding plugin (plugins/generic/funding) is installed and enabled.
      */
-    function _getCoarAccessRights() {
-        static $coarAccessRights = array(
-            'openAccess' => array('label' => 'open access', 'url' => 'http://purl.org/coar/access_right/c_abf2'),
-            'embargoedAccess' => array('label' => 'embargoed access', 'url' => 'http://purl.org/coar/access_right/c_abf2'),
-            'restrictedAccess' => array('label' => 'restricted access', 'url' => 'http://purl.org/coar/access_right/c_abf2'),
-            'metadataOnlyAccess' => array('label' => 'metadata only access', 'url' => 'http://purl.org/coar/access_right/c_abf2')
-        );
-        return $coarAccessRights;
+    protected function getFundingReferences(int $submissionId): ?string
+    {
+        if (!PluginRegistry::getPlugin('generic', 'FundingPlugin')) {
+            return null;
+        }
+        /** @var FunderDAO $funderDao */
+        $funderDao = DAORegistry::getDAO('FunderDAO');
+        /** @var FunderAwardDAO $funderAwardDao */
+        $funderAwardDao = DAORegistry::getDAO('FunderAwardDAO');
+        /** @var DAOResultFactory<Funder> $funders */
+        $funders = $funderDao->getBySubmissionId($submissionId);
+        $fundingReferences = '';
+        while ($funder = $funders->next()) { /** @var Funder $funder */
+            $funderXml = "<oaire:funderName>" . htmlspecialchars($funder->getFunderName()) . "</oaire:funderName>\n";
+            if ($funder->getFunderIdentification()) {
+                $funderXml .= "<oaire:funderIdentifier funderIdentifierType=\"Crossref Funder ID\">" . htmlspecialchars($funder->getFunderIdentification()) . "</oaire:funderIdentifier>\n";
+            }
+            $funderAwards = $funderAwardDao->getByFunderId($funder->getId());
+            $hasAward = false;
+            while ($funderAward = $funderAwards->next()) { /** @var FunderAward $funderAward */
+                $hasAward = true;
+                $fundingReferences .= "<oaire:fundingReference>\n" . $funderXml
+                        . "<oaire:awardNumber>" . htmlspecialchars($funderAward->getFunderAwardNumber()) . "</oaire:awardNumber>\n"
+                        . "</oaire:fundingReference>\n";
+            }
+            if (!$hasAward) {
+                $fundingReferences .= "<oaire:fundingReference>\n" . $funderXml . "</oaire:fundingReference>\n";
+            }
+        }
+        if (!$fundingReferences) {
+            return null;
+        }
+        return "<oaire:fundingReferences>\n" . $fundingReferences . "</oaire:fundingReferences>\n";
     }
 
     /**
      * Get a JATS article-type string based on COAR Resource Type URI.
      * https://jats.nlm.nih.gov/archiving/tag-library/1.1/attribute/article-type.html
-     * @param $uri string
-     * @return string
      */
-    function _mapCoarResourceTypeToJatsArticleType($uri) {
-        $resourceTypes = array(
+    public function mapCoarResourceTypeToJatsArticleType(string $uri): ?string
+    {
+        $resourceTypes = [
             'http://purl.org/coar/resource_type/c_6501' => 'research-article',
             'http://purl.org/coar/resource_type/c_2df8fbb1' => 'research-article',
             'http://purl.org/coar/resource_type/c_dcae04bc' => 'review-article',
@@ -316,94 +345,52 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
             'http://purl.org/coar/resource_type/c_5794' => 'meeting-report',
             'http://purl.org/coar/resource_type/c_46ec' => 'dissertation',
             'http://purl.org/coar/resource_type/c_8042' => 'research-article',
-            'http://purl.org/coar/resource_type/c_816b' => 'research-article'
-        );
+            'http://purl.org/coar/resource_type/c_816b' => 'research-article',
+        ];
         return $resourceTypes[$uri];
     }
 
     /**
-     * Get an associative array containing page info
-     * @return array
+     * Get an associative array containing page info, or null if the
+     * publication's pages aren't expressible as a single numeric range.
+     *
+     * OAIRE's citationStartPage/citationEndPage expect a page number (their
+     * example is "100"), not a literal page label, so non-numeric pages
+     * (e.g. roman-numeral front matter) and multi-range pagination (e.g.
+     * front matter + article pages, where it's ambiguous which range is
+     * citable) are intentionally left unreported rather than guessed.
      */
-    function _getPageInfo($publication) {
-        $pages = trim((string) $publication->getData('pages'));
-        $matches = [];
-
-        // 123
-        if (preg_match('/^(\d+)$/', $pages, $matches)) {
-            $matchedPage = htmlspecialchars($matches[1], ENT_QUOTES, 'UTF-8');
-            return [
-                'fpage' => $matchedPage,
-                'lpage' => $matchedPage,
-                'pagecount' => '1',
-            ];
+    protected function getPageInfo(Publication $publication): ?array
+    {
+        $ranges = $publication->getPageArray();
+        if (count($ranges) !== 1) {
+            return null;
         }
-
-        // p. 123 / pp. 123 / P123
-        if (preg_match('/^[Pp][Pp]?[.]?[ ]?(\d+)$/', $pages, $matches)) {
-            $matchedPage = htmlspecialchars($matches[1], ENT_QUOTES, 'UTF-8');
-            return [
-                'fpage' => $matchedPage,
-                'lpage' => $matchedPage,
-                'pagecount' => '1',
-            ];
+        $fpage = $ranges[0][0] ?? null;
+        $lpage = $ranges[0][1] ?? $fpage;
+        if (!is_numeric($fpage) || !is_numeric($lpage) || $lpage < $fpage) {
+            return null;
         }
-
-        // p. 123-130 / pp. 123-130 / 123-pp.130
-        if (preg_match('/^[Pp][Pp]?[.]?[ ]?(\d+)[ ]?-[ ]?([Pp][Pp]?[.]?[ ]?)?(\d+)$/', $pages, $matches)) {
-            $matchedPageFrom = (int) $matches[1];
-            $matchedPageTo = (int) $matches[3];
-
-            if ($matchedPageTo < $matchedPageFrom) {
-                return null;
-            }
-
-            return [
-                'fpage' => (string) $matchedPageFrom,
-                'lpage' => (string) $matchedPageTo,
-                'pagecount' => (string) ($matchedPageTo - $matchedPageFrom + 1),
-            ];
-        }
-
-        // 123-130
-        if (preg_match('/^(\d+)[ ]?-[ ]?(\d+)$/', $pages, $matches)) {
-            $matchedPageFrom = (int) $matches[1];
-            $matchedPageTo = (int) $matches[2];
-
-            if ($matchedPageTo < $matchedPageFrom) {
-                return null;
-            }
-
-            return [
-                'fpage' => (string) $matchedPageFrom,
-                'lpage' => (string) $matchedPageTo,
-                'pagecount' => (string) ($matchedPageTo - $matchedPageFrom + 1),
-            ];
-        }
-
-        return null;
+        return ['fpage' => htmlspecialchars($fpage), 'lpage' => htmlspecialchars($lpage), 'pagecount' => $lpage - $fpage + 1];
     }
 
     /**
      * Get article access rights
-     * @param $journal
-     * @param $issue
-     * @param $article
-     * @return string
      */
-    function _getAccessRights($journal, $issue, $article) {
+    protected function getAccessRights(Journal $journal, Issue $issue, Publication $publication): ?string
+    {
         $accessRights = null;
-        if ($journal->getData('publishingMode') == PUBLISHING_MODE_OPEN) {
+        if ($journal->getData('publishingMode') == Journal::PUBLISHING_MODE_OPEN) {
             $accessRights = 'openAccess';
-        } else if ($journal->getData('publishingMode') == PUBLISHING_MODE_SUBSCRIPTION) {
-            if ($issue->getAccessStatus() == 0 || $issue->getAccessStatus() == ISSUE_ACCESS_OPEN) {
+        } else if ($journal->getData('publishingMode') == Journal::PUBLISHING_MODE_SUBSCRIPTION) {
+            if ($issue->getAccessStatus() == 0 || $issue->getAccessStatus() == Issue::ISSUE_ACCESS_OPEN) {
                 $accessRights = 'openAccess';
-            } else if ($issue->getAccessStatus() == ISSUE_ACCESS_SUBSCRIPTION) {
-                if (is_a($article, 'PublishedArticle') && $article->getAccessStatus() == ARTICLE_ACCESS_OPEN) {
+            } else if ($issue->getAccessStatus() == Issue::ISSUE_ACCESS_SUBSCRIPTION) {
+                if ($publication->getData('accessStatus') == Submission::ARTICLE_ACCESS_OPEN) {
                     $accessRights = 'openAccess';
-                } else if ($issue->getAccessStatus() == ISSUE_ACCESS_SUBSCRIPTION && $issue->getOpenAccessDate() != NULL) {
+                } else if ($issue->getOpenAccessDate() != null) {
                     $accessRights = 'embargoedAccess';
-                } else if ($issue->getAccessStatus() == ISSUE_ACCESS_SUBSCRIPTION && $issue->getOpenAccessDate() == NULL) {
+                } else {
                     $accessRights = 'metadataOnlyAccess';
                 }
             }
@@ -417,12 +404,12 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
     /**
      * Get the Creative Commons license labels associated with a given
      * license URL.
-     * @param $ccLicenseURL URL to creative commons license
      * @param $locale string Optional locale to return badge in
      * @return string HTML code for CC license
      */
-    public function _getCCLicenseLabel($ccLicenseUrl, $locale = null) {
-        $licenseKeyMap = array(
+    protected function getCCLicenseLabel(string $ccLicenseUrl, ?string $locale = null): ?string
+    {
+        $licenseKeyMap = [
             '|http[s]?://(www\.)?creativecommons.org/licenses/by-nc-nd/4.0[/]?|' => 'submission.license.cc.by-nc-nd4',
             '|http[s]?://(www\.)?creativecommons.org/licenses/by-nc/4.0[/]?|' => 'submission.license.cc.by-nc4',
             '|http[s]?://(www\.)?creativecommons.org/licenses/by-nc-sa/4.0[/]?|' => 'submission.license.cc.by-nc-sa4',
@@ -434,8 +421,8 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
             '|http[s]?://(www\.)?creativecommons.org/licenses/by-nc-sa/3.0[/]?|' => 'submission.license.cc.by-nc-sa3',
             '|http[s]?://(www\.)?creativecommons.org/licenses/by-nd/3.0[/]?|' => 'submission.license.cc.by-nd3',
             '|http[s]?://(www\.)?creativecommons.org/licenses/by/3.0[/]?|' => 'submission.license.cc.by3',
-            '|http[s]?://(www\.)?creativecommons.org/licenses/by-sa/3.0[/]?|' => 'submission.license.cc.by-sa3'
-        );
+            '|http[s]?://(www\.)?creativecommons.org/licenses/by-sa/3.0[/]?|' => 'submission.license.cc.by-sa3',
+        ];
         if (is_null($locale)) {
             $locale = Locale::getLocale();
         }
@@ -447,12 +434,10 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         }
         return null;
     }
-    public function isMainSubmission($submissionFile){
-        
-        $fileService = app()->get('file');
-        $filepath = $fileService->get($submissionFile->getData('fileId'))->path;
-
+    public function isMainDocumentFile(SubmissionFile $submissionFile): bool
+    {
         static $genres = [];
+        /** @var GenreDAO $genreDao */
         $genreDao = DAORegistry::getDAO('GenreDAO');
         $genreId = $submissionFile->getData('genreId');
         if (!isset($genres[$genreId])) {

@@ -14,7 +14,7 @@
 	<application>openAIREstandard</application>
 	<type>plugins.generic</type>
 	<release>1.0.2.0</release>
-	<date>2026-03-23</date>
+	<date>2026-07-08</date>
 	<lazy-load>1</lazy-load>
 	<class>OpenAIREstandardPlugin</class>
 </version>

@@ -3,8 +3,8 @@
 /**
  * @file OAIMetadataFormatPlugin_OpenAIREstandard.inc.php
  *
- * Copyright (c) 2014-2020 Simon Fraser University
- * Copyright (c) 2003-2020 John Willinsky
+ * Copyright (c) 2014-2026 Simon Fraser University
+ * Copyright (c) 2003-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class OAIMetadataFormatPlugin_OpenAIRE
@@ -21,40 +21,46 @@ class OAIMetadataFormatPlugin_OpenAIREstandard extends OAIMetadataFormatPlugin {
 	/**
 	 * Get the name of this plugin. The name must be unique within
 	 * its category.
-	 * @return String name of plugin
 	 */
-	function getName() {
+	public function getName(): string
+	{
 		return 'OAIMetadataFormatPlugin_OpenAIREstandard';
 	}
 
 	/**
 	 * @copydoc Plugin::getDisplayName()
 	 */
-	function getDisplayName() {
+	public function getDisplayName(): string
+	{
 		return __('plugins.oaiMetadata.openAIREstandard.displayName');
 	}
 
 	/**
 	 * @copydoc Plugin::getDescription()
 	 */
-	function getDescription() {
+	public function getDescription(): string
+	{
 		return __('plugins.oaiMetadata.openAIREstandard.description');
 	}
 
-	function getFormatClass() {
+	public function getFormatClass(): string
+	{
 		return '\APP\plugins\generic\openAIREstandard\OAIMetadataFormat_OpenAIREstandard';
 	}
 
-	static function getMetadataPrefix() {
-            //return 'oai_openaire_jats';
+	public static function getMetadataPrefix(): string
+	{
+        //return 'oai_openaire_jats';
 		return 'oai_openaire';
 	}
 
-	static function getSchema() {
+	public static function getSchema(): string
+	{
 		return 'https://www.openaire.eu/schema/repo-lit/4.0/openaire.xsd';
 	}
 
-	static function getNamespace() {
+	public static function getNamespace(): string
+	{
 		return 'https://openaire-guidelines-for-literature-repository-managers.readthedocs.io/en/v4.0.0/application_profile.html';
 	}
 }
