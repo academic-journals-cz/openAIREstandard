@@ -1,30 +1,31 @@
 <?php
 
 /**
- * @file OAIMetadataFormatPlugin_OpenAIREstandard.inc.php
+ * @file OAIMetadataFormatPlugin_OpenAIREjats.php
  *
  * Copyright (c) 2014-2026 Simon Fraser University
  * Copyright (c) 2003-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class OAIMetadataFormatPlugin_OpenAIREstandard
+ * @class OAIMetadataFormatPlugin_OpenAIREjats
  * @ingroup oai_format_openaire
  * @see OAI
  *
- * @brief OAI COAR/DataCite XML format plugin for OpenAIRE.
+ * @brief OAI JATS XML format plugin for OpenAIRE.
  */
+
 namespace APP\plugins\generic\openAIREstandard;
 
 use PKP\plugins\OAIMetadataFormatPlugin;
 
-class OAIMetadataFormatPlugin_OpenAIREstandard extends OAIMetadataFormatPlugin {
+class OAIMetadataFormatPlugin_OpenAIREjats extends OAIMetadataFormatPlugin {
 	/**
 	 * Get the name of this plugin. The name must be unique within
 	 * its category.
 	 */
 	public function getName(): string
 	{
-		return 'OAIMetadataFormatPlugin_OpenAIREstandard';
+		return 'OAIMetadataFormatPlugin_OpenAIREjats';
 	}
 
 	/**
@@ -32,7 +33,7 @@ class OAIMetadataFormatPlugin_OpenAIREstandard extends OAIMetadataFormatPlugin {
 	 */
 	public function getDisplayName(): string
 	{
-		return __('plugins.oaiMetadata.openAIREstandard.displayName');
+		return __('plugins.oaiMetadata.openAIREstandard.jats.displayName');
 	}
 
 	/**
@@ -40,26 +41,26 @@ class OAIMetadataFormatPlugin_OpenAIREstandard extends OAIMetadataFormatPlugin {
 	 */
 	public function getDescription(): string
 	{
-		return __('plugins.oaiMetadata.openAIREstandard.description');
+		return __('plugins.oaiMetadata.openAIREstandard.jats.description');
 	}
 
 	public function getFormatClass(): string
 	{
-		return '\APP\plugins\generic\openAIREstandard\OAIMetadataFormat_OpenAIREstandard';
+		return '\APP\plugins\generic\openAIREstandard\OAIMetadataFormat_OpenAIREjats';
 	}
 
 	public static function getMetadataPrefix(): string
 	{
-		return 'oai_openaire';
+		return 'oai_openaire_jats';
 	}
 
 	public static function getSchema(): string
 	{
-		return 'https://www.openaire.eu/schema/repo-lit/4.0/openaire.xsd';
+		return 'https://jats.nlm.nih.gov/publishing/0.4/xsd/JATS-journalpublishing0.xsd';
 	}
 
 	public static function getNamespace(): string
 	{
-		return 'https://openaire-guidelines-for-literature-repository-managers.readthedocs.io/en/v4.0.0/application_profile.html';
+		return 'http://jats.nlm.nih.gov';
 	}
 }

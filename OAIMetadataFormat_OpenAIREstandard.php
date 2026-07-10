@@ -21,14 +21,10 @@ namespace APP\plugins\generic\openAIREstandard;
 
 use APP\core\Application;
 use APP\facades\Repo;
-use APP\issue\Issue;
-use APP\journal\Journal;
 use APP\plugins\generic\funding\classes\Funder;
 use APP\plugins\generic\funding\classes\FunderAward;
 use APP\plugins\generic\funding\classes\FunderAwardDAO;
 use APP\plugins\generic\funding\classes\FunderDAO;
-use APP\publication\Publication;
-use APP\submission\Submission;
 use PKP\core\PKPString;
 use PKP\db\DAOResultFactory;
 use PKP\facades\Locale;
@@ -63,7 +59,9 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         $publisherInstitution = $journal->getData('publisherInstitution');
         $datePublished = $publication->getData('datePublished');
         $publicationDoi = $publication->getDoi();
-        $accessRights = $this->getAccessRights($journal, $issue, $publication);
+        /** @var OpenAIREstandardPlugin $parentPlugin */
+        $parentPlugin = PluginRegistry::getPlugin('generic', 'openairestandardplugin');
+        $accessRights = $parentPlugin->getAccessRights($journal, $issue, $publication);
         $resourceType = ($section->getData('resourceType') ? $section->getData('resourceType') : 'http://purl.org/coar/resource_type/c_6501'); # COAR resource type URI, defaults to "journal article"
         $audience = $section->getData('audience');
         if (!$datePublished) {
@@ -72,8 +70,6 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         if ($datePublished) {
             $datePublished = strtotime($datePublished);
         }
-        /** @var OpenAIREstandardPlugin $parentPlugin */
-        $parentPlugin = PluginRegistry::getPlugin('generic', 'openairestandardplugin');
 
         //resource - defining schemas and namespaces
         $response = "<resource xmlns=\"http://namespace.openaire.eu/schema/oaire/\" xmlns:rdf=\"http://www.w3.org/TR/rdf-concepts/\" xmlns:doc=\"http://www.lyncode.com/xoai\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:dcterms=\"http://purl.org/dc/terms/\" xmlns:oaire=\"http://namespace.openaire.eu/schema/oaire/\" xmlns:datacite=\"http://datacite.org/schema/kernel-4\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" xmlns:vc=\"http://www.w3.org/2007/XMLSchema-versioning\"  xsi:schemaLocation=\"http://namespace.openaire.eu/schema/oaire/ https://www.openaire.eu/schema/repo-lit/4.0/openaire.xsd\"> \n";
@@ -178,7 +174,7 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         $response .= "<datacite:identifier identifierType=\"URL\">" . $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, null, 'article', 'view', [$article->getBestId()], urlLocaleForPage: '') . "</datacite:identifier>\n";
 
         //15. Access Rights (M) - OpenAIRE COAR Access Rights
-        $coarAccessRights = self::COAR_ACCESS_RIGHTS;
+        $coarAccessRights = OpenAIREstandardPlugin::COAR_ACCESS_RIGHTS;
 
         if ($accessRights) {
             $response .= "<datacite:rights rightsURI=\"" . $coarAccessRights[$accessRights]['url'] . "\">" . $coarAccessRights[$accessRights]['label'] . "</datacite:rights>\n";
@@ -234,7 +230,7 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         //20. Size (O) - page count only; galley file sizes aren't reported here since
         // OJS doesn't store them and computing them would require a filesystem stat
         // per file on every OAI request, for little added value.
-        $pageInfo = $this->getPageInfo($publication);
+        $pageInfo = $parentPlugin->getPageInfo($publication);
         if ($pageInfo) {
             $response .= "<datacite:sizes>\n"
                     . "<datacite:size>" . (int) $pageInfo['pagecount'] . " Pages</datacite:size>\n"
@@ -279,13 +275,6 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         return $response;
     }
 
-    protected const COAR_ACCESS_RIGHTS = [
-        'openAccess' => ['label' => 'open access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
-        'embargoedAccess' => ['label' => 'embargoed access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
-        'restrictedAccess' => ['label' => 'restricted access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
-        'metadataOnlyAccess' => ['label' => 'metadata only access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
-    ];
-
     /**
      * Get OpenAIRE oaire:fundingReferences XML for a submission's funders,
      * if the Funding plugin (plugins/generic/funding) is installed and enabled.
@@ -326,82 +315,6 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
     }
 
     /**
-     * Get a JATS article-type string based on COAR Resource Type URI.
-     * https://jats.nlm.nih.gov/archiving/tag-library/1.1/attribute/article-type.html
-     */
-    public function mapCoarResourceTypeToJatsArticleType(string $uri): ?string
-    {
-        $resourceTypes = [
-            'http://purl.org/coar/resource_type/c_6501' => 'research-article',
-            'http://purl.org/coar/resource_type/c_2df8fbb1' => 'research-article',
-            'http://purl.org/coar/resource_type/c_dcae04bc' => 'review-article',
-            'http://purl.org/coar/resource_type/c_beb9' => 'research-article',
-            'http://purl.org/coar/resource_type/c_7bab' => 'research-article',
-            'http://purl.org/coar/resource_type/c_b239' => 'editorial',
-            'http://purl.org/coar/resource_type/c_545b' => 'letter',
-            'http://purl.org/coar/resource_type/c_93fc' => 'case-report',
-            'http://purl.org/coar/resource_type/c_efa0' => 'product-review',
-            'http://purl.org/coar/resource_type/c_ba08' => 'book-review',
-            'http://purl.org/coar/resource_type/c_5794' => 'meeting-report',
-            'http://purl.org/coar/resource_type/c_46ec' => 'dissertation',
-            'http://purl.org/coar/resource_type/c_8042' => 'research-article',
-            'http://purl.org/coar/resource_type/c_816b' => 'research-article',
-        ];
-        return $resourceTypes[$uri];
-    }
-
-    /**
-     * Get an associative array containing page info, or null if the
-     * publication's pages aren't expressible as a single numeric range.
-     *
-     * OAIRE's citationStartPage/citationEndPage expect a page number (their
-     * example is "100"), not a literal page label, so non-numeric pages
-     * (e.g. roman-numeral front matter) and multi-range pagination (e.g.
-     * front matter + article pages, where it's ambiguous which range is
-     * citable) are intentionally left unreported rather than guessed.
-     */
-    protected function getPageInfo(Publication $publication): ?array
-    {
-        $ranges = $publication->getPageArray();
-        if (count($ranges) !== 1) {
-            return null;
-        }
-        $fpage = $ranges[0][0] ?? null;
-        $lpage = $ranges[0][1] ?? $fpage;
-        if (!is_numeric($fpage) || !is_numeric($lpage) || $lpage < $fpage) {
-            return null;
-        }
-        return ['fpage' => htmlspecialchars($fpage), 'lpage' => htmlspecialchars($lpage), 'pagecount' => $lpage - $fpage + 1];
-    }
-
-    /**
-     * Get article access rights
-     */
-    protected function getAccessRights(Journal $journal, Issue $issue, Publication $publication): ?string
-    {
-        $accessRights = null;
-        if ($journal->getData('publishingMode') == Journal::PUBLISHING_MODE_OPEN) {
-            $accessRights = 'openAccess';
-        } else if ($journal->getData('publishingMode') == Journal::PUBLISHING_MODE_SUBSCRIPTION) {
-            if ($issue->getAccessStatus() == 0 || $issue->getAccessStatus() == Issue::ISSUE_ACCESS_OPEN) {
-                $accessRights = 'openAccess';
-            } else if ($issue->getAccessStatus() == Issue::ISSUE_ACCESS_SUBSCRIPTION) {
-                if ($publication->getData('accessStatus') == Submission::ARTICLE_ACCESS_OPEN) {
-                    $accessRights = 'openAccess';
-                } else if ($issue->getOpenAccessDate() != null) {
-                    $accessRights = 'embargoedAccess';
-                } else {
-                    $accessRights = 'metadataOnlyAccess';
-                }
-            }
-        }
-        if ($journal->getData('restrictSiteAccess') == 1 || $journal->getData('restrictArticleAccess') == 1) {
-            $accessRights = 'restrictedAccess';
-        }
-        return $accessRights;
-    }
-
-    /**
      * Get the Creative Commons license labels associated with a given
      * license URL.
      * @param $locale string Optional locale to return badge in
@@ -416,12 +329,17 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
             '|http[s]?://(www\.)?creativecommons.org/licenses/by-nd/4.0[/]?|' => 'submission.license.cc.by-nd4',
             '|http[s]?://(www\.)?creativecommons.org/licenses/by/4.0[/]?|' => 'submission.license.cc.by4',
             '|http[s]?://(www\.)?creativecommons.org/licenses/by-sa/4.0[/]?|' => 'submission.license.cc.by-sa4',
-            '|http[s]?://(www\.)?creativecommons.org/licenses/by-nc-nd/3.0[/]?|' => 'submission.license.cc.by-nc-nd3',
-            '|http[s]?://(www\.)?creativecommons.org/licenses/by-nc/3.0[/]?|' => 'submission.license.cc.by-nc3',
-            '|http[s]?://(www\.)?creativecommons.org/licenses/by-nc-sa/3.0[/]?|' => 'submission.license.cc.by-nc-sa3',
-            '|http[s]?://(www\.)?creativecommons.org/licenses/by-nd/3.0[/]?|' => 'submission.license.cc.by-nd3',
-            '|http[s]?://(www\.)?creativecommons.org/licenses/by/3.0[/]?|' => 'submission.license.cc.by3',
-            '|http[s]?://(www\.)?creativecommons.org/licenses/by-sa/3.0[/]?|' => 'submission.license.cc.by-sa3',
+            // Core has no short-label translation for CC 3.0 licenses (only
+            // the full HTML badge under the ".footer" key) -- use that
+            // instead, since getting real text is better than the
+            // otherwise-missing-key "##key##" placeholder. strip_tags()
+            // at the call site reduces the badge HTML to its inner sentence.
+            '|http[s]?://(www\.)?creativecommons.org/licenses/by-nc-nd/3.0[/]?|' => 'submission.license.cc.by-nc-nd3.footer',
+            '|http[s]?://(www\.)?creativecommons.org/licenses/by-nc/3.0[/]?|' => 'submission.license.cc.by-nc3.footer',
+            '|http[s]?://(www\.)?creativecommons.org/licenses/by-nc-sa/3.0[/]?|' => 'submission.license.cc.by-nc-sa3.footer',
+            '|http[s]?://(www\.)?creativecommons.org/licenses/by-nd/3.0[/]?|' => 'submission.license.cc.by-nd3.footer',
+            '|http[s]?://(www\.)?creativecommons.org/licenses/by/3.0[/]?|' => 'submission.license.cc.by3.footer',
+            '|http[s]?://(www\.)?creativecommons.org/licenses/by-sa/3.0[/]?|' => 'submission.license.cc.by-sa3.footer',
         ];
         if (is_null($locale)) {
             $locale = Locale::getLocale();

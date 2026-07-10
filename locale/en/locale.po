@@ -44,3 +44,9 @@ msgstr "Provides a gateway plugin for OpenAIRE Standard-related requests."
 msgid "plugins.generic.openAIREstandard.gateway.errorMessage"
 msgstr "The specified OpenAIRE Standard gateway object was not found."
 
+msgid "plugins.oaiMetadata.openAIREstandard.jats.displayName"
+msgstr "OpenAIRE JATS Metadata Format"
+
+msgid "plugins.oaiMetadata.openAIREstandard.jats.description"
+msgstr "Structures metadata in a way that is consistent with the OpenAIRE Guidelines for Literature Repository Managers v4 (JATS)."
+

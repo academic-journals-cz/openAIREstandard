@@ -17,12 +17,18 @@ namespace APP\plugins\generic\openAIREstandard;
 
 use APP\core\Application;
 use APP\facades\Repo;
+use APP\issue\Issue;
+use APP\journal\Journal;
+use APP\publication\Publication;
+use APP\submission\Submission;
 use stdClass;
 use PKP\plugins\GenericPlugin;
 use PKP\plugins\Hook;
 use PKP\plugins\PluginRegistry;
 use APP\plugins\generic\openAIREstandard\OAIMetadataFormatPlugin_OpenAIREstandard;
+use APP\plugins\generic\openAIREstandard\OAIMetadataFormatPlugin_OpenAIREjats;
 use APP\plugins\generic\openAIREstandard\OpenAIREstandardGatewayPlugin;
+use APP\plugins\generic\openAIREstandard\OpenAIREjatsGatewayPlugin;
 
 class OpenAIREstandardPlugin extends GenericPlugin {
 
@@ -33,8 +39,10 @@ class OpenAIREstandardPlugin extends GenericPlugin {
     {
         $success = parent::register($category, $path, $mainContextId);
         if ($success && $this->getEnabled($mainContextId)) {
-            PluginRegistry::register('oaiMetadataFormats', new OAIMetadataFormatPlugin_OpenAIREstandard($this), $this->getPluginPath());
+            PluginRegistry::register('oaiMetadataFormats', new OAIMetadataFormatPlugin_OpenAIREstandard(), $this->getPluginPath());
+            PluginRegistry::register('oaiMetadataFormats', new OAIMetadataFormatPlugin_OpenAIREjats(), $this->getPluginPath());
             PluginRegistry::register('gateways', new OpenAIREstandardGatewayPlugin($this), $this->getPluginPath());
+            PluginRegistry::register('gateways', new OpenAIREjatsGatewayPlugin($this), $this->getPluginPath());
 
             # Handle COAR resource types in section forms
             Hook::add('Schema::get::section', [$this, 'addToSchema']);
@@ -187,6 +195,63 @@ class OpenAIREstandardPlugin extends GenericPlugin {
         } else {
             return $resourceTypes;
         }
+    }
+
+    public const COAR_ACCESS_RIGHTS = [
+        'openAccess' => ['label' => 'open access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
+        'embargoedAccess' => ['label' => 'embargoed access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
+        'restrictedAccess' => ['label' => 'restricted access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
+        'metadataOnlyAccess' => ['label' => 'metadata only access', 'url' => 'http://purl.org/coar/access_right/c_abf2'],
+    ];
+
+    /**
+     * Get article access rights. Shared by both OAI metadata formats
+     * (COAR/DataCite and JATS), which need identical access-rights logic.
+     */
+    public function getAccessRights(Journal $journal, Issue $issue, Publication $publication): ?string
+    {
+        $accessRights = null;
+        if ($journal->getData('publishingMode') == Journal::PUBLISHING_MODE_OPEN) {
+            $accessRights = 'openAccess';
+        } else if ($journal->getData('publishingMode') == Journal::PUBLISHING_MODE_SUBSCRIPTION) {
+            if ($issue->getAccessStatus() == 0 || $issue->getAccessStatus() == Issue::ISSUE_ACCESS_OPEN) {
+                $accessRights = 'openAccess';
+            } else if ($issue->getAccessStatus() == Issue::ISSUE_ACCESS_SUBSCRIPTION) {
+                if ($publication->getData('accessStatus') == Submission::ARTICLE_ACCESS_OPEN) {
+                    $accessRights = 'openAccess';
+                } else if ($issue->getOpenAccessDate() != null) {
+                    $accessRights = 'embargoedAccess';
+                } else {
+                    $accessRights = 'metadataOnlyAccess';
+                }
+            }
+        }
+        if ($journal->getData('restrictSiteAccess') == 1 || $journal->getData('restrictArticleAccess') == 1) {
+            $accessRights = 'restrictedAccess';
+        }
+        return $accessRights;
+    }
+
+    /**
+     * Get an associative array containing page info, or null if the
+     * publication's pages aren't expressible as a single numeric range.
+     * Shared by both OAI metadata formats, which both need to reject
+     * non-numeric/multi-range pagination rather than guess (see
+     * citationStartPage/citationEndPage and fpage/lpage/page-count usage
+     * in each format's toXml()).
+     */
+    public function getPageInfo(Publication $publication): ?array
+    {
+        $ranges = $publication->getPageArray();
+        if (count($ranges) !== 1) {
+            return null;
+        }
+        $fpage = $ranges[0][0] ?? null;
+        $lpage = $ranges[0][1] ?? $fpage;
+        if (!is_numeric($fpage) || !is_numeric($lpage) || $lpage < $fpage) {
+            return null;
+        }
+        return ['fpage' => htmlspecialchars($fpage), 'lpage' => htmlspecialchars($lpage), 'pagecount' => $lpage - $fpage + 1];
     }
 
     /**
