@@ -3,8 +3,8 @@
 /**
  * @file OpenAIREstandardGatewayPlugin.inc.php
  *
- * Copyright (c) 2014-2024 Simon Fraser University
- * Copyright (c) 2003-2024 John Willinsky
+ * Copyright (c) 2014-2026 Simon Fraser University
+ * Copyright (c) 2003-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
  * @class OpenAIREGateway
@@ -15,51 +15,60 @@
 
 namespace APP\plugins\generic\openAIREstandard;
 
+use APP\core\Application;
+use APP\journal\Journal;
 use APP\journal\JournalDAO;
+use APP\template\TemplateManager;
 use PKP\db\DAORegistry;
-use PKP\core\PKPString;
 use PKP\plugins\GatewayPlugin;
 
 class OpenAIREstandardGatewayPlugin extends GatewayPlugin {
-	protected $_parentPlugin;
-	
+	protected OpenAIREstandardPlugin $_parentPlugin;
+
 	/**
 	 * Constructor
-	 * @param $parentPlugin OpenAIREstandardPlugin
 	 */
-	function __construct($parentPlugin) {
+	public function __construct(OpenAIREstandardPlugin $parentPlugin)
+	{
 		$this->_parentPlugin = $parentPlugin;
 		parent::__construct();
 	}
 
-	function getName() {
+	public function getName(): string
+	{
 		return 'OpenAIREstandardGatewayPlugin';
 	}
 
-	function getDisplayName() {
+	public function getDisplayName(): string
+	{
 		return __('plugins.generic.openAIREstandard.gateway.displayName');
 	}
 
-	function getDescription() {
+	public function getDescription(): string
+	{
 		return __('plugins.generic.openAIREstandard.gateway.description');
 	}
 
-	public function getPluginPath() {
+	public function getPluginPath(): string
+	{
 		return $this->_parentPlugin->getPluginPath();
 	}
 
-	public function getHideManagement() {
+	public function getHideManagement(): bool
+	{
 		return true;
-	}	
+	}
 
-	public function getEnabled() {
+	public function getEnabled(): bool
+	{
 		return $this->_parentPlugin->getEnabled();
 	}
 
 	/**
 	 * Handle fetch requests for this plugin.
 	 */
-	function fetch($args, $request) {
+	public function fetch($args, $request): bool
+	{
 		if (!$this->getEnabled()) {
 			return false;
 		}
@@ -74,31 +83,32 @@ class OpenAIREstandardGatewayPlugin extends GatewayPlugin {
 		// Failure.
 		header('HTTP/1.0 404 Not Found');
 		$templateMgr = TemplateManager::getManager($request);
-		AppLocale::requireComponents(LOCALE_COMPONENT_APP_COMMON);
-		$templateMgr->assign('message', 'plugins.generic.openAIRE.gateway.errorMessage');
+		$templateMgr->assign('message', 'plugins.generic.openAIREstandard.gateway.errorMessage');
 		$templateMgr->display('frontend/pages/message.tpl');
 		exit;
 	}
 
-	function showObjects() {
+	protected function showObjects(): void
+	{
+		/** @var JournalDAO $journalDao	*/
 		$journalDao = DAORegistry::getDAO('JournalDAO');
-		$issueDao = DAORegistry::getDAO('IssueDAO');
 		$journals = $journalDao->getAll(true);
 		$request = $this->getRequest();
 		$dispatcher = $request->getDispatcher();
 		header('content-type: text/plain');
 		header('content-disposition: attachment; filename=objects-' . date("Y-m-d") . '.txt');
-		while ($journal = $journals->next()) {
-			if ( ($journal->getSetting('onlineIssn') || $journal->getSetting('printIssn') ) && $journal->getEnabled() && $journal->getSetting('publishingMode') != PUBLISHING_MODE_NONE) {
-					$journalData[$journal->getId()]['url'] = $dispatcher->url($request, ROUTE_PAGE, $journal->getPath());
-					$journalData[$journal->getId()]['issn'] = $journal->getSetting('printIssn');
-					$journalData[$journal->getId()]['eissn'] = $journal->getSetting('onlineIssn');
+		$journalData = [];
+		while ($journal = $journals->next()) { /** @var Journal $journal */
+			if ( ($journal->getData('onlineIssn') || $journal->getData('printIssn') ) && $journal->getEnabled() && $journal->getData('publishingMode') != Journal::PUBLISHING_MODE_NONE) {
+					$journalData[$journal->getId()]['url'] = $dispatcher->url($request, Application::ROUTE_PAGE, $journal->getPath());
+					$journalData[$journal->getId()]['issn'] = $journal->getData('printIssn');
+					$journalData[$journal->getId()]['eissn'] = $journal->getData('onlineIssn');
 					$journalData[$journal->getId()]['primaryLanguage'] = $journal->getPrimaryLocale();
 					$journalData[$journal->getId()]['name'] = $journal->getName(null);
 			}
 		}
 		echo json_encode($journalData);
-		exit;	
+		exit;
 	}
 }
 

@@ -32,6 +32,21 @@ msgstr "For better OpenAIRE compliance, uses COAR Resource Type Genres <a target
 msgid "plugins.generic.openAIREstandard.audience.title" 
 msgstr "Choose Audience for articles in this section"
 
-msgid "plugins.generic.openAIREstandard.audience.description" 
+msgid "plugins.generic.openAIREstandard.audience.description"
 msgstr "A class of entity may be determined by the creator or the publisher or by a third party. An example of audiences given is derived from the <a target=\"_new\" href=\"https://ceds.ed.gov/element/001492\">Common Education Data Standards vocabulary</a>. Please note the list is not exhaustive."
+
+msgid "plugins.generic.openAIREstandard.gateway.displayName"
+msgstr "OpenAIRE Standard Gateway"
+
+msgid "plugins.generic.openAIREstandard.gateway.description"
+msgstr "Provides a gateway plugin for OpenAIRE Standard-related requests."
+
+msgid "plugins.generic.openAIREstandard.gateway.errorMessage"
+msgstr "The specified OpenAIRE Standard gateway object was not found."
+
+msgid "plugins.oaiMetadata.openAIREstandard.jats.displayName"
+msgstr "OpenAIRE JATS Metadata Format"
+
+msgid "plugins.oaiMetadata.openAIREstandard.jats.description"
+msgstr "Structures metadata in a way that is consistent with the OpenAIRE Guidelines for Literature Repository Managers v4 (JATS)."
 
