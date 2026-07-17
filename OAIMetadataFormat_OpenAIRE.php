@@ -4,20 +4,20 @@
  * @defgroup oai_format_openaire
  */
 /**
- * @file OAIMetadataFormat_OpenAIREstandard.php
+ * @file OAIMetadataFormat_OpenAIRE.php
  *
  * Copyright (c) 2013-2026 Simon Fraser University
  * Copyright (c) 2003-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class OAIMetadataFormat_OpenAIREstandard
+ * @class OAIMetadataFormat_OpenAIRE
  * @ingroup oai_format
  * @see OAI
  *
- * @brief OAI metadata format class -- OpenAIREstandard
+ * @brief OAI metadata format class -- OpenAIRE (COAR/DataCite)
  */
 
-namespace APP\plugins\generic\openAIREstandard;
+namespace APP\plugins\generic\openAIRE;
 
 use APP\core\Application;
 use APP\facades\Repo;
@@ -37,7 +37,7 @@ use PKP\submissionFile\SubmissionFile;
 use PKP\i18n\LocaleConversion;
 use PKP\core\PKPApplication;
 
-class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
+class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
 
     /**
      * @see OAIMetadataFormat::toXml()
@@ -59,8 +59,8 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         $publisherInstitution = $journal->getData('publisherInstitution');
         $datePublished = $publication->getData('datePublished');
         $publicationDoi = $publication->getDoi();
-        /** @var OpenAIREstandardPlugin $parentPlugin */
-        $parentPlugin = PluginRegistry::getPlugin('generic', 'openairestandardplugin');
+        /** @var OpenAIREPlugin $parentPlugin */
+        $parentPlugin = PluginRegistry::getPlugin('generic', 'openaireplugin');
         $accessRights = $parentPlugin->getAccessRights($journal, $issue, $publication);
         $resourceType = ($section->getData('resourceType') ? $section->getData('resourceType') : 'http://purl.org/coar/resource_type/c_6501'); # COAR resource type URI, defaults to "journal article"
         $audience = $section->getData('audience');
@@ -174,7 +174,7 @@ class OAIMetadataFormat_OpenAIREstandard extends OAIMetadataFormat {
         $response .= "<datacite:identifier identifierType=\"URL\">" . $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, null, 'article', 'view', [$article->getBestId()], urlLocaleForPage: '') . "</datacite:identifier>\n";
 
         //15. Access Rights (M) - OpenAIRE COAR Access Rights
-        $coarAccessRights = OpenAIREstandardPlugin::COAR_ACCESS_RIGHTS;
+        $coarAccessRights = OpenAIREPlugin::COAR_ACCESS_RIGHTS;
 
         if ($accessRights) {
             $response .= "<datacite:rights rightsURI=\"" . $coarAccessRights[$accessRights]['url'] . "\">" . $coarAccessRights[$accessRights]['label'] . "</datacite:rights>\n";

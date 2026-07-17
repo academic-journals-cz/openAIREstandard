@@ -11,42 +11,42 @@ msgstr ""
 "PO-Revision-Date: 2021-02-08T09:17:52+01:00\n"
 "Language: \n"
 
-msgid "plugins.generic.openAIREstandard.displayName" 
-msgstr "OpenAIRE Standard"
+msgid "plugins.generic.openAIRE.displayName"
+msgstr "OpenAIRE"
 
-msgid "plugins.generic.openAIREstandard.description" 
-msgstr "OpenAIRE Guidelines for Literature Repository Managers v4 compliance - standard plugin."
+msgid "plugins.generic.openAIRE.description"
+msgstr "OpenAIRE Guidelines for Literature Repository Managers v4 compliance."
 
-msgid "plugins.oaiMetadata.openAIREstandard.displayName" 
-msgstr "OpenAIRE Standard Metadata Format"
+msgid "plugins.oaiMetadata.openAIRE.displayName"
+msgstr "OpenAIRE Metadata Format"
 
-msgid "plugins.oaiMetadata.openAIREstandard.description" 
+msgid "plugins.oaiMetadata.openAIRE.description"
 msgstr "Structures metadata in a way that is consistent with the OpenAIRE Guidelines for Literature Repository Managers v4."
 
-msgid "plugins.generic.openAIREstandard.resourceType.title" 
+msgid "plugins.generic.openAIRE.resourceType.title"
 msgstr "Type of articles published in this section"
 
-msgid "plugins.generic.openAIREstandard.resourceType.description" 
+msgid "plugins.generic.openAIRE.resourceType.description"
 msgstr "For better OpenAIRE compliance, uses COAR Resource Type Genres <a target=\"_new\" href=\"http://vocabularies.coar-repositories.org/documentation/resource_types/2.0.draft/\">http://vocabularies.coar-repositories.org/documentation/resource_types/2.0.draft/</a>"
 
-msgid "plugins.generic.openAIREstandard.audience.title" 
+msgid "plugins.generic.openAIRE.audience.title"
 msgstr "Choose Audience for articles in this section"
 
-msgid "plugins.generic.openAIREstandard.audience.description"
+msgid "plugins.generic.openAIRE.audience.description"
 msgstr "A class of entity may be determined by the creator or the publisher or by a third party. An example of audiences given is derived from the <a target=\"_new\" href=\"https://ceds.ed.gov/element/001492\">Common Education Data Standards vocabulary</a>. Please note the list is not exhaustive."
 
-msgid "plugins.generic.openAIREstandard.gateway.displayName"
-msgstr "OpenAIRE Standard Gateway"
+msgid "plugins.generic.openAIRE.gateway.displayName"
+msgstr "OpenAIRE Gateway"
 
-msgid "plugins.generic.openAIREstandard.gateway.description"
-msgstr "Provides a gateway plugin for OpenAIRE Standard-related requests."
+msgid "plugins.generic.openAIRE.gateway.description"
+msgstr "Provides a gateway plugin for OpenAIRE-related requests."
 
-msgid "plugins.generic.openAIREstandard.gateway.errorMessage"
-msgstr "The specified OpenAIRE Standard gateway object was not found."
+msgid "plugins.generic.openAIRE.gateway.errorMessage"
+msgstr "The specified OpenAIRE gateway object was not found."
 
-msgid "plugins.oaiMetadata.openAIREstandard.jats.displayName"
+msgid "plugins.oaiMetadata.openAIRE.jats.displayName"
 msgstr "OpenAIRE JATS Metadata Format"
 
-msgid "plugins.oaiMetadata.openAIREstandard.jats.description"
+msgid "plugins.oaiMetadata.openAIRE.jats.description"
 msgstr "Structures metadata in a way that is consistent with the OpenAIRE Guidelines for Literature Repository Managers v4 (JATS)."
 

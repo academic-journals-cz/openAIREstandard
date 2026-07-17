@@ -9,10 +9,10 @@
  *
  *}
 <div style="clear:both;">
-	{fbvFormSection title="plugins.generic.openAIREstandard.resourceType.title" for="resourceType" inline=true}
-		{fbvElement type="select" id="resourceType" from=$resourceTypeOptions selected=$resourceType label="plugins.generic.openAIREstandard.resourceType.description" translate=false}
+	{fbvFormSection title="plugins.generic.openAIRE.resourceType.title" for="resourceType" inline=true}
+		{fbvElement type="select" id="resourceType" from=$resourceTypeOptions selected=$resourceType label="plugins.generic.openAIRE.resourceType.description" translate=false}
 	{/fbvFormSection}
-        {fbvFormSection title="plugins.generic.openAIREstandard.audience.title" for="audience" inline=true}
-		{fbvElement type="select" id="audience" from=$audienceOptions selected=$audience label="plugins.generic.openAIREstandard.audience.description" translate=false}
+        {fbvFormSection title="plugins.generic.openAIRE.audience.title" for="audience" inline=true}
+		{fbvElement type="select" id="audience" from=$audienceOptions selected=$audience label="plugins.generic.openAIRE.audience.description" translate=false}
 	{/fbvFormSection}
 </div>

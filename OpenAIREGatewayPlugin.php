@@ -1,19 +1,19 @@
 <?php
 
 /**
- * @file OpenAIREstandardGatewayPlugin.inc.php
+ * @file OpenAIREGatewayPlugin.php
  *
  * Copyright (c) 2014-2026 Simon Fraser University
  * Copyright (c) 2003-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class OpenAIREGateway
- * @ingroup plugins_gateways_OpenAIREstandardGateway
+ * @class OpenAIREGatewayPlugin
+ * @ingroup plugins_gateways_OpenAIREGateway
  *
- * @brief OpenAIREstandardGateway plugin
+ * @brief OpenAIRE (COAR/DataCite) gateway plugin
  */
 
-namespace APP\plugins\generic\openAIREstandard;
+namespace APP\plugins\generic\openAIRE;
 
 use APP\core\Application;
 use APP\journal\Journal;
@@ -22,18 +22,22 @@ use APP\template\TemplateManager;
 use PKP\db\DAORegistry;
 use PKP\plugins\GatewayPlugin;
 
-class OpenAIREstandardGatewayPlugin extends GatewayPlugin {
-	protected OpenAIREstandardPlugin $_parentPlugin;
+class OpenAIREGatewayPlugin extends GatewayPlugin {
+	protected OpenAIREPlugin $_parentPlugin;
 
 	/**
 	 * Constructor
 	 */
-	public function __construct(OpenAIREstandardPlugin $parentPlugin)
+	public function __construct(OpenAIREPlugin $parentPlugin)
 	{
 		$this->_parentPlugin = $parentPlugin;
 		parent::__construct();
 	}
 
+	/**
+	 * Intentionally kept as the pre-rename class name string for URL
+	 * backward-compat (.../gateway/plugin/OpenAIREstandardGatewayPlugin/objects).
+	 */
 	public function getName(): string
 	{
 		return 'OpenAIREstandardGatewayPlugin';
@@ -41,12 +45,12 @@ class OpenAIREstandardGatewayPlugin extends GatewayPlugin {
 
 	public function getDisplayName(): string
 	{
-		return __('plugins.generic.openAIREstandard.gateway.displayName');
+		return __('plugins.generic.openAIRE.gateway.displayName');
 	}
 
 	public function getDescription(): string
 	{
-		return __('plugins.generic.openAIREstandard.gateway.description');
+		return __('plugins.generic.openAIRE.gateway.description');
 	}
 
 	public function getPluginPath(): string
@@ -83,7 +87,7 @@ class OpenAIREstandardGatewayPlugin extends GatewayPlugin {
 		// Failure.
 		header('HTTP/1.0 404 Not Found');
 		$templateMgr = TemplateManager::getManager($request);
-		$templateMgr->assign('message', 'plugins.generic.openAIREstandard.gateway.errorMessage');
+		$templateMgr->assign('message', 'plugins.generic.openAIRE.gateway.errorMessage');
 		$templateMgr->display('frontend/pages/message.tpl');
 		exit;
 	}

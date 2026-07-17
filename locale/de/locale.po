@@ -11,8 +11,8 @@ msgstr ""
 "PO-Revision-Date: 2021-02-08T09:17:52+01:00\n"
 "Language: \n"
 
-msgid "plugins.oaiMetadata.openAIREstandard.jats.displayName"
+msgid "plugins.oaiMetadata.openAIRE.jats.displayName"
 msgstr "OpenAIRE JATS Metadatenformat"
 
-msgid "plugins.oaiMetadata.openAIREstandard.jats.description"
+msgid "plugins.oaiMetadata.openAIRE.jats.description"
 msgstr "Strukturiert Metadaten so, dass sie konform zu den OpenAIRE Guidelines for Literature Repository Managers v4 sind."
