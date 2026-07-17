@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE install SYSTEM "../../../lib/pkp/dtd/install.dtd">
+
+<!--
+  * plugins/generic/openAIRE/install.xml
+  *
+  * Copyright (c) 2026 Simon Fraser University
+  * Copyright (c) 2026 John Willinsky
+  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
+  *
+  * Descriptor for this plugin's own fresh install. Runs
+  * OpenAIREstandardCleanupMigration to clean up leftovers from the retired
+  * openAIREstandard plugin. Safe to run unconditionally: every step inside
+  * the migration is a no-op if there's nothing to clean up.
+  -->
+
+<install>
+	<migration class="APP\plugins\generic\openAIRE\OpenAIREstandardCleanupMigration" />
+</install>

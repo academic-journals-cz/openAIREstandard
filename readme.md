@@ -16,6 +16,9 @@ PHP 8.2 or greater.
 
 For OJS 3.3.0/3.4.0, use the corresponding earlier release listed under "Latest Versions" below.
 
+## Installation
+For OJS 3.5, please install this plugin via the Plugin Gallery rather than copying the files in manually. If you are switching over from the openAIREstandard plugin, installing via the Plugin Gallery ensures any leftover openAIREstandard data is cleaned up automatically as part of the install.
+
 ## Latest Versions
 - Version 3.5.0-1 – Merged in the openAIRE (JATS) plugin's oai_openaire_jats format and renamed from openAIREstandard to OpenAIRE, taking over as the sole go-forward plugin for OpenAIRE OAI-PMH compliance (both oai_openaire and oai_openaire_jats); the old standalone https://github.com/ojsde/openAIRE plugin is retired and will not release for OJS >= 3.5
 - Version 1.0.2-0 – Support for OJS 3.5.0

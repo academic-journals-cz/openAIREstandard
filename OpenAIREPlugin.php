@@ -22,13 +22,17 @@ use APP\journal\Journal;
 use APP\publication\Publication;
 use APP\submission\Submission;
 use stdClass;
+use Illuminate\Database\Migrations\Migration;
+use PKP\db\DAORegistry;
 use PKP\plugins\GenericPlugin;
 use PKP\plugins\Hook;
 use PKP\plugins\PluginRegistry;
+use PKP\site\VersionDAO;
 use APP\plugins\generic\openAIRE\OAIMetadataFormatPlugin_OpenAIRE;
 use APP\plugins\generic\openAIRE\OAIMetadataFormatPlugin_OpenAIREJats;
 use APP\plugins\generic\openAIRE\OpenAIREGatewayPlugin;
 use APP\plugins\generic\openAIRE\OpenAIREJatsGatewayPlugin;
+use APP\plugins\generic\openAIRE\OpenAIREstandardCleanupMigration;
 
 class OpenAIREPlugin extends GenericPlugin {
 
@@ -38,7 +42,15 @@ class OpenAIREPlugin extends GenericPlugin {
     public function register($category, $path, $mainContextId = null)
     {
         $success = parent::register($category, $path, $mainContextId);
-        if ($success && $this->getEnabled($mainContextId)) {
+        if (!$success) {
+            return false;
+        }
+
+        if (Application::isUnderMaintenance()) {
+            return true;
+        }
+
+        if ($this->getEnabled($mainContextId)) {
             PluginRegistry::register('oaiMetadataFormats', new OAIMetadataFormatPlugin_OpenAIRE(), $this->getPluginPath());
             PluginRegistry::register('oaiMetadataFormats', new OAIMetadataFormatPlugin_OpenAIREJats(), $this->getPluginPath());
             PluginRegistry::register('gateways', new OpenAIREGatewayPlugin($this), $this->getPluginPath());
@@ -52,8 +64,38 @@ class OpenAIREPlugin extends GenericPlugin {
             Hook::add('sectionform::execute', [$this, 'executeSectionFormFields']);
 
             $this->_registerTemplateResource();
+
+            $this->cleanupOpenAIREstandardIfNeeded();
         }
         return $success;
+    }
+
+    /**
+     * @copydoc Plugin::getInstallMigration()
+     *
+     * Covers manual installs done via tools/installPluginVersion.php, which
+     * calls this directly (not via a hook), so it isn't affected by the
+     * install.xml/hook timing issue noted below.
+     */
+    public function getInstallMigration(): ?Migration
+    {
+        return new OpenAIREstandardCleanupMigration();
+    }
+
+    /**
+     * Fallback cleanup of leftover openAIREstandard data, for anything
+     * install.xml and getInstallMigration() miss (e.g. a plugin folder
+     * that only ever got auto-registered via the admin Plugins page).
+     * Runs on every enabled page load; self-limiting since it finds
+     * nothing once the leftover row is disabled.
+     */
+    protected function cleanupOpenAIREstandardIfNeeded(): void
+    {
+        /** @var VersionDAO $versionDao */
+        $versionDao = DAORegistry::getDAO('VersionDAO');
+        if ($versionDao->getCurrentVersion('plugins.generic', 'openAIREstandard')) {
+            (new OpenAIREstandardCleanupMigration())->up();
+        }
     }
 
     /**
