@@ -5,20 +5,20 @@
  */
 
 /**
- * @file OAIMetadataFormat_OpenAIREjats.php
+ * @file OAIMetadataFormat_OpenAIREJats.php
  *
  * Copyright (c) 2013-2026 Simon Fraser University
  * Copyright (c) 2003-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class OAIMetadataFormat_OpenAIREjats
+ * @class OAIMetadataFormat_OpenAIREJats
  * @ingroup oai_format
  * @see OAI
  *
  * @brief OAI metadata format class -- OpenAIRE JATS
  */
 
-namespace APP\plugins\generic\openAIREstandard;
+namespace APP\plugins\generic\openAIRE;
 
 use APP\core\Application;
 use APP\facades\Repo;
@@ -30,7 +30,7 @@ use PKP\plugins\Hook;
 use PKP\plugins\PluginRegistry;
 use PKP\submission\GenreDAO;
 
-class OAIMetadataFormat_OpenAIREjats extends OAIMetadataFormat {
+class OAIMetadataFormat_OpenAIREJats extends OAIMetadataFormat {
 
 	/**
 	 * @see OAIMetadataFormat::toXml()
@@ -51,8 +51,8 @@ class OAIMetadataFormat_OpenAIREjats extends OAIMetadataFormat {
 		$sectionTitle = $section->getTitle($journal->getPrimaryLocale());
 		$datePublished = $publication->getData('datePublished');
 		$publicationDoi = $publication->getDoi();
-		/** @var OpenAIREstandardPlugin $parentPlugin */
-		$parentPlugin = PluginRegistry::getPlugin('generic', 'openairestandardplugin');
+		/** @var OpenAIREPlugin $parentPlugin */
+		$parentPlugin = PluginRegistry::getPlugin('generic', 'openaireplugin');
 		$accessRights = $parentPlugin->getAccessRights($journal, $issue, $publication);
 		$resourceType = ($section->getData('resourceType') ? $section->getData('resourceType') : 'http://purl.org/coar/resource_type/c_6501'); # COAR resource type URI, defaults to "journal article"
 		if (!$datePublished) $datePublished = $issue->getData('datePublished');
@@ -255,7 +255,7 @@ class OAIMetadataFormat_OpenAIREjats extends OAIMetadataFormat {
 			($pageInfo?"\t\t\t<counts><page-count count=\"" . (int) $pageInfo['pagecount'] . "\" /></counts>\n":'');
 
 		// OpenAIRE COAR Access Rights and OpenAIRE COAR Resource Type
-		$coarAccessRights = OpenAIREstandardPlugin::COAR_ACCESS_RIGHTS;
+		$coarAccessRights = OpenAIREPlugin::COAR_ACCESS_RIGHTS;
 		$coarResourceLabel = $parentPlugin->getCoarResourceType($resourceType);
 
 		if ($accessRights || $coarResourceLabel){

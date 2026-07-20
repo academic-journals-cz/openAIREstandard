@@ -1,19 +1,19 @@
 <?php
 
 /**
- * @file plugins/generic/openAIREstandard/OpenAIREstandardPlugin.inc.php
+ * @file plugins/generic/openAIRE/OpenAIREPlugin.php
  *
  * Copyright (c) 2014-2026 Simon Fraser University
  * Copyright (c) 2003-2026 John Willinsky
  * Distributed under the GNU GPL v3. For full terms see the file docs/COPYING.
  *
- * @class OpenAIREstandardPlugin
- * @ingroup plugins_generic_openAIREstandard
+ * @class OpenAIREPlugin
+ * @ingroup plugins_generic_openAIRE
  *
- * @brief OpenAIREstandard plugin class
+ * @brief OpenAIRE plugin class
  */
 
-namespace APP\plugins\generic\openAIREstandard;
+namespace APP\plugins\generic\openAIRE;
 
 use APP\core\Application;
 use APP\facades\Repo;
@@ -22,15 +22,19 @@ use APP\journal\Journal;
 use APP\publication\Publication;
 use APP\submission\Submission;
 use stdClass;
+use Illuminate\Database\Migrations\Migration;
+use PKP\db\DAORegistry;
 use PKP\plugins\GenericPlugin;
 use PKP\plugins\Hook;
 use PKP\plugins\PluginRegistry;
-use APP\plugins\generic\openAIREstandard\OAIMetadataFormatPlugin_OpenAIREstandard;
-use APP\plugins\generic\openAIREstandard\OAIMetadataFormatPlugin_OpenAIREjats;
-use APP\plugins\generic\openAIREstandard\OpenAIREstandardGatewayPlugin;
-use APP\plugins\generic\openAIREstandard\OpenAIREjatsGatewayPlugin;
+use PKP\site\VersionDAO;
+use APP\plugins\generic\openAIRE\OAIMetadataFormatPlugin_OpenAIRE;
+use APP\plugins\generic\openAIRE\OAIMetadataFormatPlugin_OpenAIREJats;
+use APP\plugins\generic\openAIRE\OpenAIREGatewayPlugin;
+use APP\plugins\generic\openAIRE\OpenAIREJatsGatewayPlugin;
+use APP\plugins\generic\openAIRE\OpenAIREstandardCleanupMigration;
 
-class OpenAIREstandardPlugin extends GenericPlugin {
+class OpenAIREPlugin extends GenericPlugin {
 
     /**
      * @copydoc Plugin::register()
@@ -38,11 +42,19 @@ class OpenAIREstandardPlugin extends GenericPlugin {
     public function register($category, $path, $mainContextId = null)
     {
         $success = parent::register($category, $path, $mainContextId);
-        if ($success && $this->getEnabled($mainContextId)) {
-            PluginRegistry::register('oaiMetadataFormats', new OAIMetadataFormatPlugin_OpenAIREstandard(), $this->getPluginPath());
-            PluginRegistry::register('oaiMetadataFormats', new OAIMetadataFormatPlugin_OpenAIREjats(), $this->getPluginPath());
-            PluginRegistry::register('gateways', new OpenAIREstandardGatewayPlugin($this), $this->getPluginPath());
-            PluginRegistry::register('gateways', new OpenAIREjatsGatewayPlugin($this), $this->getPluginPath());
+        if (!$success) {
+            return false;
+        }
+
+        if (Application::isUnderMaintenance()) {
+            return true;
+        }
+
+        if ($this->getEnabled($mainContextId)) {
+            PluginRegistry::register('oaiMetadataFormats', new OAIMetadataFormatPlugin_OpenAIRE(), $this->getPluginPath());
+            PluginRegistry::register('oaiMetadataFormats', new OAIMetadataFormatPlugin_OpenAIREJats(), $this->getPluginPath());
+            PluginRegistry::register('gateways', new OpenAIREGatewayPlugin($this), $this->getPluginPath());
+            PluginRegistry::register('gateways', new OpenAIREJatsGatewayPlugin($this), $this->getPluginPath());
 
             # Handle COAR resource types in section forms
             Hook::add('Schema::get::section', [$this, 'addToSchema']);
@@ -52,8 +64,38 @@ class OpenAIREstandardPlugin extends GenericPlugin {
             Hook::add('sectionform::execute', [$this, 'executeSectionFormFields']);
 
             $this->_registerTemplateResource();
+
+            $this->cleanupOpenAIREstandardIfNeeded();
         }
         return $success;
+    }
+
+    /**
+     * @copydoc Plugin::getInstallMigration()
+     *
+     * Covers manual installs done via tools/installPluginVersion.php, which
+     * calls this directly (not via a hook), so it isn't affected by the
+     * install.xml/hook timing issue noted below.
+     */
+    public function getInstallMigration(): ?Migration
+    {
+        return new OpenAIREstandardCleanupMigration();
+    }
+
+    /**
+     * Fallback cleanup of leftover openAIREstandard data, for anything
+     * install.xml and getInstallMigration() miss (e.g. a plugin folder
+     * that only ever got auto-registered via the admin Plugins page).
+     * Runs on every enabled page load; self-limiting since it finds
+     * nothing once the leftover row is disabled.
+     */
+    protected function cleanupOpenAIREstandardIfNeeded(): void
+    {
+        /** @var VersionDAO $versionDao */
+        $versionDao = DAORegistry::getDAO('VersionDAO');
+        if ($versionDao->getCurrentVersion('plugins.generic', 'openAIREstandard')) {
+            (new OpenAIREstandardCleanupMigration())->up();
+        }
     }
 
     /**
@@ -61,7 +103,7 @@ class OpenAIREstandardPlugin extends GenericPlugin {
      */
     public function getDisplayName(): string
     {
-        return __('plugins.generic.openAIREstandard.displayName');
+        return __('plugins.generic.openAIRE.displayName');
     }
 
     /**
@@ -69,7 +111,7 @@ class OpenAIREstandardPlugin extends GenericPlugin {
      */
     public function getDescription(): string
     {
-        return __('plugins.generic.openAIREstandard.description');
+        return __('plugins.generic.openAIRE.description');
     }
 
     /**
