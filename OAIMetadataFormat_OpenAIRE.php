@@ -36,6 +36,11 @@ use PKP\submission\GenreDAO;
 use PKP\submissionFile\SubmissionFile;
 use PKP\i18n\LocaleConversion;
 use PKP\core\PKPApplication;
+use PKP\core\PKPRequest;
+use PKP\publication\enums\VersionRelationType;
+use APP\journal\Journal;
+use APP\publication\Publication;
+use APP\submission\Submission;
 
 class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
 
@@ -116,6 +121,12 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
             $response .= "<datacite:alternateIdentifiers>\n"
                     . "<datacite:alternateIdentifier alternateIdentifierType=\"DOI\">" . htmlspecialchars($publicationDoi) . "</datacite:alternateIdentifier>\n"
                     . "</datacite:alternateIdentifiers>\n";
+        }
+
+        //6. Related Identifier (R) - the immediately preceding published version, if any
+        $relatedIdentifiers = $this->getRelatedIdentifiersXml($publication, $article, $journal, $request);
+        if ($relatedIdentifiers) {
+            $response .= $relatedIdentifiers;
         }
 
         //8. Languages (MA) - taken from galley locales
@@ -273,6 +284,45 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
         $response .= "</resource>\n";
 
         return $response;
+    }
+
+    /**
+     * Get datacite:relatedIdentifiers XML linking to the immediately preceding
+     * published version, if any, per OpenAIRE guideline v4 element 6 (Related
+     * Identifier).
+     */
+    protected function getRelatedIdentifiersXml(Publication $publication, Submission $article, Journal $journal, PKPRequest $request): ?string
+    {
+        $versionRelation = Repo::publication()->getVersionRelation($publication, $article, $journal);
+        if (!$versionRelation) {
+            return null;
+        }
+
+        $relationType = match ($versionRelation->relationType) {
+            VersionRelationType::IS_NEW_VERSION_OF => 'IsNewVersionOf',
+            VersionRelationType::IS_PREVIOUS_VERSION_OF => 'IsPreviousVersionOf',
+            VersionRelationType::IS_VERSION_OF => 'IsVersionOf',
+        };
+
+        if ($versionRelation->doi) {
+            $relatedIdentifierType = 'DOI';
+            $relatedIdentifierValue = $versionRelation->doi;
+        } else {
+            $relatedIdentifierType = 'URL';
+            $relatedIdentifierValue = $request->getDispatcher()->url(
+                $request,
+                PKPApplication::ROUTE_PAGE,
+                $journal->getPath(),
+                'article',
+                'view',
+                [$article->getBestId(), 'version', $versionRelation->publicationId],
+                urlLocaleForPage: ''
+            );
+        }
+
+        return "<datacite:relatedIdentifiers>\n"
+                . "<datacite:relatedIdentifier relatedIdentifierType=\"" . $relatedIdentifierType . "\" relationType=\"" . $relationType . "\">" . htmlspecialchars($relatedIdentifierValue) . "</datacite:relatedIdentifier>\n"
+                . "</datacite:relatedIdentifiers>\n";
     }
 
     /**
