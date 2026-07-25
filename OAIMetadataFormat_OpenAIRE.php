@@ -64,7 +64,7 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
         $accessRights = $parentPlugin->getAccessRights($journal, $issue, $publication);
         $resourceType = ($section->getData('resourceType') ? $section->getData('resourceType') : 'http://purl.org/coar/resource_type/c_6501'); # COAR resource type URI, defaults to "journal article"
         $audience = $section->getData('audience');
-        if (!$datePublished) {
+        if (!$datePublished && $issue) {
             $datePublished = $issue->getData('datePublished');
         }
         if ($datePublished) {
@@ -171,7 +171,7 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
         }
 
         //14. Resource Identifier (M) - landing page link
-        $response .= "<datacite:identifier identifierType=\"URL\">" . $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, null, 'article', 'view', [$article->getBestId()], urlLocaleForPage: '') . "</datacite:identifier>\n";
+        $response .= "<datacite:identifier identifierType=\"URL\">" . $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, $journal->getPath(), 'article', 'view', [$article->getBestId()], urlLocaleForPage: '') . "</datacite:identifier>\n";
 
         //15. Access Rights (M) - OpenAIRE COAR Access Rights
         $coarAccessRights = OpenAIREPlugin::COAR_ACCESS_RIGHTS;
@@ -242,7 +242,7 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
             $galley = $mainGalley['galley'];
             $galleyFile = $mainGalley['file'];
             if ($galleyFile->getData('fileId')) {
-                $response .= "<oaire:file accessRightsURI=\"" . $coarAccessRights[$accessRights]['url'] . "\" mimeType=\"" . htmlspecialchars($galleyFile->getData('mimetype')) . "\" objectType=\"fulltext\">" . htmlspecialchars($request->url($journal->getPath(), 'article', 'download', [$article->getBestId(), $galley->getBestGalleyId()], null, null, true)) . "</oaire:file>\n";
+                $response .= "<oaire:file accessRightsURI=\"" . $coarAccessRights[$accessRights]['url'] . "\" mimeType=\"" . htmlspecialchars($galleyFile->getData('mimetype')) . "\" objectType=\"fulltext\">" . htmlspecialchars($request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, $journal->getPath(), 'article', 'download', [$article->getBestId(), $galley->getBestGalleyId()], null, null, true, '')) . "</oaire:file>\n";
             }
         }
 
@@ -250,12 +250,12 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
         $response .= "<oaire:citationTitle>" . htmlspecialchars($journal->getName($journal->getPrimaryLocale())) . "</oaire:citationTitle>\n";
 
         //25. Citation Volume (R)
-        if ($issue->getVolume() && $issue->getShowVolume()) {
+        if ($issue && $issue->getVolume() && $issue->getShowVolume()) {
             $response .= "<oaire:citationVolume>" . htmlspecialchars($issue->getVolume()) . "</oaire:citationVolume>\n";
         }
 
         //26. Citation Issue (R)
-        if ($issue->getNumber() && $issue->getShowNumber()) {
+        if ($issue && $issue->getNumber() && $issue->getShowNumber()) {
             $response .= "<oaire:citationIssue>" . htmlspecialchars($issue->getNumber()) . "</oaire:citationIssue>\n";
         }
 
