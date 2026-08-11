@@ -146,10 +146,10 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
 
         //ISSN + eISSN
         if ($printIssn) {
-            $response .= "<dc:source>ISSN: " . $printIssn . "</dc:source>";
+            $response .= "<dc:source>ISSN: " . htmlspecialchars($printIssn) . "</dc:source>";
         }
         if ($onlineIssn) {
-            $response .= "<dc:source>eISSN: " . $onlineIssn . "</dc:source>";
+            $response .= "<dc:source>eISSN: " . htmlspecialchars($onlineIssn) . "</dc:source>";
         }
 
         //9. Publisher (MA)
@@ -182,7 +182,7 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
         }
 
         //14. Resource Identifier (M) - landing page link
-        $response .= "<datacite:identifier identifierType=\"URL\">" . $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, $journal->getPath(), 'article', 'view', [$article->getBestId()], urlLocaleForPage: '') . "</datacite:identifier>\n";
+        $response .= "<datacite:identifier identifierType=\"URL\">" . htmlspecialchars($request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, $journal->getPath(), 'article', 'view', [$article->getBestId()], urlLocaleForPage: '')) . "</datacite:identifier>\n";
 
         //15. Access Rights (M) - OpenAIRE COAR Access Rights
         $coarAccessRights = OpenAIREPlugin::COAR_ACCESS_RIGHTS;
