@@ -36,6 +36,11 @@ use PKP\submission\GenreDAO;
 use PKP\submissionFile\SubmissionFile;
 use PKP\i18n\LocaleConversion;
 use PKP\core\PKPApplication;
+use PKP\core\PKPRequest;
+use PKP\publication\enums\VersionRelationType;
+use APP\journal\Journal;
+use APP\publication\Publication;
+use APP\submission\Submission;
 
 class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
 
@@ -64,7 +69,7 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
         $accessRights = $parentPlugin->getAccessRights($journal, $issue, $publication);
         $resourceType = ($section->getData('resourceType') ? $section->getData('resourceType') : 'http://purl.org/coar/resource_type/c_6501'); # COAR resource type URI, defaults to "journal article"
         $audience = $section->getData('audience');
-        if (!$datePublished) {
+        if (!$datePublished && $issue) {
             $datePublished = $issue->getData('datePublished');
         }
         if ($datePublished) {
@@ -118,6 +123,12 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
                     . "</datacite:alternateIdentifiers>\n";
         }
 
+        //6. Related Identifier (R) - the immediately preceding published version, if any
+        $relatedIdentifiers = $this->getRelatedIdentifiersXml($publication, $article, $journal, $request);
+        if ($relatedIdentifiers) {
+            $response .= $relatedIdentifiers;
+        }
+
         //8. Languages (MA) - taken from galley locales
         $galleyLocales = [];
         $mainGalleysList = [];
@@ -135,10 +146,10 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
 
         //ISSN + eISSN
         if ($printIssn) {
-            $response .= "<dc:source>ISSN: " . $printIssn . "</dc:source>";
+            $response .= "<dc:source>ISSN: " . htmlspecialchars($printIssn) . "</dc:source>";
         }
         if ($onlineIssn) {
-            $response .= "<dc:source>eISSN: " . $onlineIssn . "</dc:source>";
+            $response .= "<dc:source>eISSN: " . htmlspecialchars($onlineIssn) . "</dc:source>";
         }
 
         //9. Publisher (MA)
@@ -171,7 +182,7 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
         }
 
         //14. Resource Identifier (M) - landing page link
-        $response .= "<datacite:identifier identifierType=\"URL\">" . $request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, null, 'article', 'view', [$article->getBestId()], urlLocaleForPage: '') . "</datacite:identifier>\n";
+        $response .= "<datacite:identifier identifierType=\"URL\">" . htmlspecialchars($request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, $journal->getPath(), 'article', 'view', [$article->getBestId()], urlLocaleForPage: '')) . "</datacite:identifier>\n";
 
         //15. Access Rights (M) - OpenAIRE COAR Access Rights
         $coarAccessRights = OpenAIREPlugin::COAR_ACCESS_RIGHTS;
@@ -242,7 +253,7 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
             $galley = $mainGalley['galley'];
             $galleyFile = $mainGalley['file'];
             if ($galleyFile->getData('fileId')) {
-                $response .= "<oaire:file accessRightsURI=\"" . $coarAccessRights[$accessRights]['url'] . "\" mimeType=\"" . htmlspecialchars($galleyFile->getData('mimetype')) . "\" objectType=\"fulltext\">" . htmlspecialchars($request->url($journal->getPath(), 'article', 'download', [$article->getBestId(), $galley->getBestGalleyId()], null, null, true)) . "</oaire:file>\n";
+                $response .= "<oaire:file accessRightsURI=\"" . $coarAccessRights[$accessRights]['url'] . "\" mimeType=\"" . htmlspecialchars($galleyFile->getData('mimetype')) . "\" objectType=\"fulltext\">" . htmlspecialchars($request->getDispatcher()->url($request, PKPApplication::ROUTE_PAGE, $journal->getPath(), 'article', 'download', [$article->getBestId(), $galley->getBestGalleyId()], null, null, true, '')) . "</oaire:file>\n";
             }
         }
 
@@ -250,12 +261,12 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
         $response .= "<oaire:citationTitle>" . htmlspecialchars($journal->getName($journal->getPrimaryLocale())) . "</oaire:citationTitle>\n";
 
         //25. Citation Volume (R)
-        if ($issue->getVolume() && $issue->getShowVolume()) {
+        if ($issue && $issue->getVolume() && $issue->getShowVolume()) {
             $response .= "<oaire:citationVolume>" . htmlspecialchars($issue->getVolume()) . "</oaire:citationVolume>\n";
         }
 
         //26. Citation Issue (R)
-        if ($issue->getNumber() && $issue->getShowNumber()) {
+        if ($issue && $issue->getNumber() && $issue->getShowNumber()) {
             $response .= "<oaire:citationIssue>" . htmlspecialchars($issue->getNumber()) . "</oaire:citationIssue>\n";
         }
 
@@ -273,6 +284,45 @@ class OAIMetadataFormat_OpenAIRE extends OAIMetadataFormat {
         $response .= "</resource>\n";
 
         return $response;
+    }
+
+    /**
+     * Get datacite:relatedIdentifiers XML linking to the immediately preceding
+     * published version, if any, per OpenAIRE guideline v4 element 6 (Related
+     * Identifier).
+     */
+    protected function getRelatedIdentifiersXml(Publication $publication, Submission $article, Journal $journal, PKPRequest $request): ?string
+    {
+        $versionRelation = Repo::publication()->getVersionRelation($publication, $article, $journal);
+        if (!$versionRelation) {
+            return null;
+        }
+
+        $relationType = match ($versionRelation->relationType) {
+            VersionRelationType::IS_NEW_VERSION_OF => 'IsNewVersionOf',
+            VersionRelationType::IS_PREVIOUS_VERSION_OF => 'IsPreviousVersionOf',
+            VersionRelationType::IS_VERSION_OF => 'IsVersionOf',
+        };
+
+        if ($versionRelation->doi) {
+            $relatedIdentifierType = 'DOI';
+            $relatedIdentifierValue = $versionRelation->doi;
+        } else {
+            $relatedIdentifierType = 'URL';
+            $relatedIdentifierValue = $request->getDispatcher()->url(
+                $request,
+                PKPApplication::ROUTE_PAGE,
+                $journal->getPath(),
+                'article',
+                'view',
+                [$article->getBestId(), 'version', $versionRelation->publicationId],
+                urlLocaleForPage: ''
+            );
+        }
+
+        return "<datacite:relatedIdentifiers>\n"
+                . "<datacite:relatedIdentifier relatedIdentifierType=\"" . $relatedIdentifierType . "\" relationType=\"" . $relationType . "\">" . htmlspecialchars($relatedIdentifierValue) . "</datacite:relatedIdentifier>\n"
+                . "</datacite:relatedIdentifiers>\n";
     }
 
     /**
